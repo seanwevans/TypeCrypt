@@ -20,10 +20,11 @@ This document summarizes the basic coding style used in this repository and how 
 ## Running Tests
 
 ### Haskell
-Run the QuickCheck suite via cabal:
+Run the QuickCheck suite via cabal. Make sure the package index is up to date:
 
 ```bash
 cd haskell
+cabal update
 cabal test
 ```
 
