@@ -90,3 +90,12 @@ main = hspec $ do
         ct <- encrypt TInt bs
         let truncated = B.take (B.length ct - 1) ct
         pure $ decrypt TInt (V TInt n) truncated == Nothing
+
+  describe "key derivation" $ do
+    it "derive_key_deterministic" $
+      property $
+        let ty = TList TInt
+         in keyFromType ty == keyFromType ty
+    it "derive_key_distinct" $
+      property $
+        keyFromType TInt /= keyFromType TString
