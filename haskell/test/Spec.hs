@@ -23,27 +23,32 @@ main = hspec $ do
 
   describe "encrypt/decrypt" $ do
     it "roundtrips for Int" $ property $ \(n :: Int) bs ->
-      let ct = encrypt TInt bs
-       in decrypt TInt (V TInt n) ct == Just bs
+      ioProperty $ do
+        ct <- encrypt TInt bs
+        pure $ decrypt TInt (V TInt n) ct == Just bs
     it "roundtrips for String" $ property $ \(s :: String) bs ->
-      let ct = encrypt TString bs
-       in decrypt TString (V TString s) ct == Just bs
+      ioProperty $ do
+        ct <- encrypt TString bs
+        pure $ decrypt TString (V TString s) ct == Just bs
     it "roundtrips for (Int, String)" $ property $ \(a :: Int) (b :: String) bs ->
-      let ty = TPair TInt TString
-          val = V ty (a, b)
-          ct = encrypt ty bs
-       in decrypt ty val ct == Just bs
+      ioProperty $ do
+        let ty = TPair TInt TString
+            val = V ty (a, b)
+        ct <- encrypt ty bs
+        pure $ decrypt ty val ct == Just bs
     it "roundtrips for [Int]" $ property $ \(xs :: [Int]) bs ->
-      let ty = TList TInt
-          val = V ty xs
-          ct = encrypt ty bs
-       in decrypt ty val ct == Just bs
+      ioProperty $ do
+        let ty = TList TInt
+            val = V ty xs
+        ct <- encrypt ty bs
+        pure $ decrypt ty val ct == Just bs
     it "roundtrips for nested (Int, [String])" $
       property $ \(n :: Int) (xs :: [String]) bs ->
-        let ty = TPair TInt (TList TString)
-            val = V ty (n, xs)
-            ct = encrypt ty bs
-         in decrypt ty val ct == Just bs
+        ioProperty $ do
+          let ty = TPair TInt (TList TString)
+              val = V ty (n, xs)
+          ct <- encrypt ty bs
+          pure $ decrypt ty val ct == Just bs
     it "matches Bool" $ property $ \b ->
       matches (V TBool b) TBool
     it "matches Pair" $ property $ \a b ->
@@ -51,13 +56,19 @@ main = hspec $ do
     it "matches List" $ property $ \xs ->
       matches (V (TList TInt) xs) (TList TInt)
     it "roundtrips for Bool" $ property $ \(b :: Bool) bs ->
-      let ct = encrypt TBool bs
-       in decrypt TBool (V TBool b) ct == Just bs
+      ioProperty $ do
+        ct <- encrypt TBool bs
+        pure $ decrypt TBool (V TBool b) ct == Just bs
     it "roundtrips for Pair" $ property $ \(a :: Int) (b :: String) bs ->
-      let t = TPair TInt TString
-          ct = encrypt t bs
-       in decrypt t (V t (a, b)) ct == Just bs
+      ioProperty $ do
+        let t = TPair TInt TString
+        ct <- encrypt t bs
+        pure $ decrypt t (V t (a, b)) ct == Just bs
     it "roundtrips for List" $ property $ \(xs :: [Int]) bs ->
+      ioProperty $ do
+        let t = TList TInt
+        ct <- encrypt t bs
+        pure $ decrypt t (V t xs) ct == Just bs
       let t = TList TInt
           ct = encrypt t bs
        in decrypt t (V t xs) ct == Just bs

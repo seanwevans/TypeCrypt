@@ -6,6 +6,7 @@ module Types where
 import qualified Crypto.Cipher.ChaChaPoly1305 as C
 import Crypto.Error (CryptoFailable (..), throwCryptoError)
 import Crypto.MAC.Poly1305 (authTag)
+import Crypto.Random (getRandomBytes)
 import Data.ByteArray (convert)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as B
@@ -57,30 +58,29 @@ keyFromType TBool = B.replicate 32 2
 keyFromType (TPair _ _) = B.replicate 32 3
 keyFromType (TList _) = B.replicate 32 4
 
--- | Encrypt the input using ChaCha20-Poly1305 with a key derived from the type.
-encrypt :: Type a -> ByteString -> ByteString
-encrypt ty plaintext =
+encrypt :: Type a -> ByteString -> IO ByteString
+encrypt ty plaintext = do
+  nonceBytes <- getRandomBytes 12
   let key = keyFromType ty
-      nonce = case C.nonce12 (B.replicate 12 0) of
+      nonce = case C.nonce12 nonceBytes of
         CryptoFailed _ -> error "invalid nonce"
         CryptoPassed n -> n
-
       st1 = throwCryptoError $ C.initialize key nonce
       st2 = C.finalizeAAD st1
       (out, st3) = C.encrypt plaintext st2
       tag = C.finalize st3
-   in out `B.append` convert tag
+  pure $ nonceBytes `B.append` out `B.append` convert tag
 
 -- | Decrypt if the value matches the expected type and authentication tag checks.
 decrypt :: Type a -> Value -> ByteString -> Maybe ByteString
-
 decrypt ty val input
   | not (matches val ty) = Nothing
-  | B.length input < 16 = Nothing
+  | B.length input < 28 = Nothing
   | otherwise =
-      let (ct, tagBytes) = B.splitAt (B.length input - 16) input
+      let (nonceBytes, rest) = B.splitAt 12 input
+          (ct, tagBytes) = B.splitAt (B.length rest - 16) rest
           key = keyFromType ty
-          nonce = case C.nonce12 (B.replicate 12 0) of
+          nonce = case C.nonce12 nonceBytes of
             CryptoFailed _ -> error "invalid nonce"
             CryptoPassed n -> n
           st1 = throwCryptoError $ C.initialize key nonce
