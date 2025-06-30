@@ -20,6 +20,6 @@ main = hspec $ do
     it "matches Bool" $ property $ \b ->
       matches (V TBool b) TBool
     it "matches Pair" $ property $ \a b ->
-      matches (V (TPair TInt TString) (a,b)) (TPair TInt TString)
+      matches (V (TPair TInt TString) (a, b)) (TPair TInt TString)
     it "matches List" $ property $ \xs ->
       matches (V (TList TInt) xs) (TList TInt)
