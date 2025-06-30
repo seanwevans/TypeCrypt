@@ -75,3 +75,12 @@ main = hspec $ do
         ct1 <- encrypt ty bs
         ct2 <- encrypt ty bs
         pure (ct1 /= ct2)
+    it "fails to decrypt with mismatched Value" $
+      property $ \(bs :: ByteString) (s :: String) -> ioProperty $ do
+        let ty = TInt
+        ct <- encrypt ty bs
+        pure $ decrypt ty (V TString s) ct == Nothing
+    it "fails to decrypt with wrong Type" $
+      property $ \(n :: Int) bs -> ioProperty $ do
+        ct <- encrypt TInt bs
+        pure $ decrypt TString (V TInt n) ct == Nothing
