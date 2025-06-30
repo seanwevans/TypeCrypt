@@ -1,6 +1,6 @@
 # TypeCrypt 🔐
 
-**TypeCrypt** is a novel encryption system where *types themselves are the key*. Decryption is only possible if a submitted value *resolves to the expected type*.
+**TypeCrypt** is an encryption system where *types themselves are the key*. Decryption is only possible if a submitted value *resolves to the expected type*.
 
 This repo contains three coordinated implementations:
 
