@@ -15,38 +15,3 @@ This repo contains three coordinated implementations:
 In TypeCrypt, types are not just annotations — they are *structural constraints* that serve as decryption keys. A ciphertext encrypted under a type `T` can only be decrypted by a value of type `T`.
 
 This flips conventional cryptography on its head: instead of using values to unlock data, you must *satisfy a type* to access it.
-
----
-
-## 🧠 Example (Abstract)
-
-```haskell
--- Haskell
-decrypt :: TypeLock t -> t -> Ciphertext -> Maybe Message
-```
-
-```rust
-// Rust
-trait Unlockable {
-    type KeyType;
-    fn decrypt(&self, key: Self::KeyType) -> Option<Vec<u8>>;
-}
-```
-
-```zig
-// Zig (pseudo-code)
-fn decrypt(comptime T: type, key: T, ciphertext: []u8) []u8
-```
-
----
-
-## 🚧 Status
-
--
-
----
-
-## 📜 License
-
-MIT or Apache 2.0 — To be determined.
-
