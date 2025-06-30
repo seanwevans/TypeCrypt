@@ -6,18 +6,29 @@
 pub enum Type {
     Int,
     Str,
+    Bool,
+    Pair(Box<Type>, Box<Type>),
+    List(Box<Type>),
 }
 
 #[derive(Debug)]
 pub enum Value {
     Int(i32),
     Str(String),
+    Bool(bool),
+    Pair(Box<Value>, Box<Value>),
+    List(Vec<Value>),
 }
 
 pub fn matches(value: &Value, ty: &Type) -> bool {
     match (value, ty) {
         (Value::Int(_), Type::Int) => true,
         (Value::Str(_), Type::Str) => true,
+        (Value::Bool(_), Type::Bool) => true,
+        (Value::Pair(a, b), Type::Pair(ta, tb)) =>
+            matches(a, ta) && matches(b, tb),
+        (Value::List(vals), Type::List(t)) =>
+            vals.iter().all(|v| matches(v, t)),
         _ => false,
     }
 }
@@ -29,6 +40,9 @@ fn key_from_type(ty: &Type) -> aead::LessSafeKey {
     let bytes: [u8; 32] = match ty {
         Type::Int => [0u8; 32],
         Type::Str => [1u8; 32],
+        Type::Bool => [2u8; 32],
+        Type::Pair(_, _) => [3u8; 32],
+        Type::List(_) => [4u8; 32],
     };
     let unbound = aead::UnboundKey::new(&aead::CHACHA20_POLY1305, &bytes).expect("invalid key");
     aead::LessSafeKey::new(unbound)
@@ -99,6 +113,26 @@ mod tests {
     fn matches_str() {
         assert!(matches(&Value::Str("hi".into()), &Type::Str));
         assert!(!matches(&Value::Str("hi".into()), &Type::Int));
+    }
+
+    #[test]
+    fn matches_bool() {
+        assert!(matches(&Value::Bool(true), &Type::Bool));
+        assert!(!matches(&Value::Bool(true), &Type::Int));
+    }
+
+    #[test]
+    fn matches_pair() {
+        let v = Value::Pair(Box::new(Value::Int(1)), Box::new(Value::Str("a".into())));
+        let t = Type::Pair(Box::new(Type::Int), Box::new(Type::Str));
+        assert!(matches(&v, &t));
+    }
+
+    #[test]
+    fn matches_list() {
+        let v = Value::List(vec![Value::Int(1), Value::Int(2)]);
+        let t = Type::List(Box::new(Type::Int));
+        assert!(matches(&v, &t));
     }
 
     #[test]
