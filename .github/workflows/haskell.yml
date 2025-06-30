@@ -1,0 +1,32 @@
+name: Haskell CI
+
+on:
+  push:
+    paths:
+      - 'haskell/**'
+  pull_request:
+    paths:
+      - 'haskell/**'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: haskell
+    steps:
+    - uses: actions/checkout@v3
+    - name: Set up Haskell
+      uses: haskell/actions/setup@v2
+      with:
+        ghc-version: '9.2'
+    - name: Cache cabal store
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cabal/store
+          dist-newstyle
+        key: ${{ runner.os }}-cabal-${{ hashFiles('**/cabal.project', '**/*.cabal') }}
+        restore-keys: ${{ runner.os }}-cabal-
+    - name: Build
+      run: cabal build --enable-tests
