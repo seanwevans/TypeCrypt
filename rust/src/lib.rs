@@ -80,7 +80,9 @@ mod tests {
         let wrong = Value::Str("oops".into());
         let ct = encrypt(&ty, b"secret");
         assert!(decrypt_with_value(&ty, &wrong, &ct).is_none());
+    }
 
+    #[test]
     fn matches_int() {
         assert!(matches(&Value::Int(42), &Type::Int));
         assert!(!matches(&Value::Int(42), &Type::Str));
@@ -90,6 +92,5 @@ mod tests {
     fn matches_str() {
         assert!(matches(&Value::Str("hi".into()), &Type::Str));
         assert!(!matches(&Value::Str("hi".into()), &Type::Int));
-
     }
 }
