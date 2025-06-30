@@ -9,3 +9,11 @@ main = hspec $ do
       matches (V TInt n) TInt
     it "returns False for mismatched Type" $ property $ \n ->
       not (matches (V TInt n) TString)
+
+  describe "encrypt/decrypt" $ do
+    it "roundtrips for Int" $ property $ \(n :: Int) bs ->
+      let ct = encrypt TInt bs
+       in decrypt TInt (V TInt n) ct == Just bs
+    it "roundtrips for String" $ property $ \(s :: String) bs ->
+      let ct = encrypt TString bs
+       in decrypt TString (V TString s) ct == Just bs
