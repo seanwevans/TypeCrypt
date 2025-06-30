@@ -14,7 +14,6 @@ pub enum Value {
     Str(String),
 }
 
-/// Return true if the `Value` matches the expected `Type`.
 pub fn matches(value: &Value, ty: &Type) -> bool {
     match (value, ty) {
         (Value::Int(_), Type::Int) => true,
@@ -22,6 +21,7 @@ pub fn matches(value: &Value, ty: &Type) -> bool {
         _ => false,
     }
 }
+
 
 use ring::aead;
 
@@ -80,5 +80,16 @@ mod tests {
         let wrong = Value::Str("oops".into());
         let ct = encrypt(&ty, b"secret");
         assert!(decrypt_with_value(&ty, &wrong, &ct).is_none());
+
+    fn matches_int() {
+        assert!(matches(&Value::Int(42), &Type::Int));
+        assert!(!matches(&Value::Int(42), &Type::Str));
+    }
+
+    #[test]
+    fn matches_str() {
+        assert!(matches(&Value::Str("hi".into()), &Type::Str));
+        assert!(!matches(&Value::Str("hi".into()), &Type::Int));
+
     }
 }
