@@ -32,16 +32,37 @@ pub fn matches(value: &Value, ty: &Type) -> bool {
 }
 
 use ring::aead;
+use ring::digest;
 use ring::rand::{SecureRandom, SystemRandom};
 
+fn canonical_bytes(ty: &Type, out: &mut Vec<u8>) {
+    match ty {
+        Type::Int => out.push(0),
+        Type::Str => out.push(1),
+        Type::Bool => out.push(2),
+        Type::Pair(a, b) => {
+            out.push(3);
+            canonical_bytes(a, out);
+            canonical_bytes(b, out);
+        }
+        Type::List(t) => {
+            out.push(4);
+            canonical_bytes(t, out);
+        }
+    }
+}
+
+fn derive_key_bytes(ty: &Type) -> [u8; 32] {
+    let mut bytes = Vec::new();
+    canonical_bytes(ty, &mut bytes);
+    let hash = digest::digest(&digest::SHA256, &bytes);
+    let mut out = [0u8; 32];
+    out.copy_from_slice(hash.as_ref());
+    out
+}
+
 fn key_from_type(ty: &Type) -> aead::LessSafeKey {
-    let bytes: [u8; 32] = match ty {
-        Type::Int => [0u8; 32],
-        Type::Str => [1u8; 32],
-        Type::Bool => [2u8; 32],
-        Type::Pair(_, _) => [3u8; 32],
-        Type::List(_) => [4u8; 32],
-    };
+    let bytes = derive_key_bytes(ty);
     let unbound = aead::UnboundKey::new(&aead::CHACHA20_POLY1305, &bytes).expect("invalid key");
     aead::LessSafeKey::new(unbound)
 }
@@ -142,5 +163,20 @@ mod tests {
         assert_ne!(ct1, ct2);
         assert_eq!(decrypt_with_value(&ty, &value, &ct1).unwrap(), b"hello");
         assert_eq!(decrypt_with_value(&ty, &value, &ct2).unwrap(), b"hello");
+    }
+
+    #[test]
+    fn key_derivation_is_deterministic() {
+        let ty = Type::List(Box::new(Type::Int));
+        let k1 = derive_key_bytes(&ty);
+        let k2 = derive_key_bytes(&ty);
+        assert_eq!(k1, k2);
+    }
+
+    #[test]
+    fn different_types_use_different_keys() {
+        let k1 = derive_key_bytes(&Type::Int);
+        let k2 = derive_key_bytes(&Type::Str);
+        assert_ne!(k1, k2);
     }
 }

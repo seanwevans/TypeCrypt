@@ -17,7 +17,7 @@ The project is organized into four interoperating implementations:
   - Generates simple x86_64 assembly snippets for low-level exploration.
   - Serves as a sandbox for examining minimal representations.
 
-Internally each branch shares the same core idea: derive a symmetric key from a `Type` and authenticate that a runtime `Value` matches that type before revealing the plaintext.  The Haskell and Rust implementations both use fixed 32-byte keys per constructor and encrypt data with ChaCha20-Poly1305.  Although this mapping is purely demonstrative, it shows how type satisfaction gates decryption.
+Internally each branch shares the same core idea: derive a symmetric key from a `Type` and authenticate that a runtime `Value` matches that type before revealing the plaintext.  Haskell still uses fixed 32-byte keys per constructor, while Rust now hashes a canonical byte encoding of the type with SHA-256.  Both branches encrypt data with ChaCha20-Poly1305.  Although this mapping is purely demonstrative, it shows how type satisfaction gates decryption.
 
 Changes generally flow from Haskell to Rust to Zig. Haskell establishes the formal semantics; Rust implements them in a production setting; Zig prototypes new concepts that may feed back upstream.
 
