@@ -8,4 +8,7 @@
                                              (Value (Type 'str) "oops"))))
   (when (file-exists? "output.s") (delete-file "output.s"))
   (emit-add (Value TInt 1) (Value TInt 2))
+  (check-true (file-exists? "output.s"))
+  (delete-file "output.s")
+  (emit-sub (Value TInt 5) (Value TInt 2))
   (check-true (file-exists? "output.s")))
