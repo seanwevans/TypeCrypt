@@ -2,6 +2,10 @@
 
 This document outlines the plan for developing TypeCrypt across four branches: Theory (Haskell), Production (Rust), Experimental (Zig), and Assembly (Racket).
 
+TypeCrypt merges type theory with cryptography. This roadmap serves as a living
+guide for coordinating the different language implementations. Items are updated
+as work progresses and corresponding GitHub issues are resolved.
+
 ---
 
 ## 🧵 Project Threads
@@ -84,9 +88,15 @@ This document outlines the plan for developing TypeCrypt across four branches: T
 
 Each branch feeds into the others iteratively to improve correctness, performance, and flexibility.
 
+## 🤝 Contributing
+
+We welcome pull requests for any of the language branches. Before submitting,
+please read `docs/development.md` for formatting requirements and run
+`./run_all_tests.sh` to ensure all suites pass.
+
 ---
 
 ## 📬 Contact
 
-Project steward: _[your name or alias]_  
-Maintained by: _[your GitHub handle or team name]_
+Project steward: *community driven*
+Maintained by: *contributors on GitHub*
