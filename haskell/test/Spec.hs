@@ -50,3 +50,14 @@ main = hspec $ do
       matches (V (TPair TInt TString) (a, b)) (TPair TInt TString)
     it "matches List" $ property $ \xs ->
       matches (V (TList TInt) xs) (TList TInt)
+    it "roundtrips for Bool" $ property $ \(b :: Bool) bs ->
+      let ct = encrypt TBool bs
+       in decrypt TBool (V TBool b) ct == Just bs
+    it "roundtrips for Pair" $ property $ \(a :: Int) (b :: String) bs ->
+      let t = TPair TInt TString
+          ct = encrypt t bs
+       in decrypt t (V t (a, b)) ct == Just bs
+    it "roundtrips for List" $ property $ \(xs :: [Int]) bs ->
+      let t = TList TInt
+          ct = encrypt t bs
+       in decrypt t (V t xs) ct == Just bs

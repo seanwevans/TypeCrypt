@@ -2,11 +2,12 @@
 
 **TypeCrypt** is an encryption system where *types themselves are the key*. Decryption is only possible if a submitted value *resolves to the expected type*.
 
-This repo contains three coordinated implementations:
+This repo contains four coordinated implementations:
 
 - **Haskell** – the *Theory Branch*: formal specification, correctness, and type-driven logic.
 - **Rust** – the *Production Branch*: hardened system for real-world usage, throughput-optimized.
 - **Zig** – the *Experimental Branch*: compile-time metaprogramming, radical flexibility, and rapid prototyping.
+- **Racket** – the *Assembly Branch*: emits x86\_64 assembly for low-level exploration.
 
 ---
 
@@ -42,6 +43,17 @@ Each language implementation lives in its own subdirectory. To compile and verif
   cd zig
   zig build
   ```
+- **Racket**
+  ```bash
+  cd racket
+  racket main.rkt
+  ```
+
+For convenience, you can run all of the above with:
+
+```bash
+./run_all_tests.sh
+```
 
 ## License
 

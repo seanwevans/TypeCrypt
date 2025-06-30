@@ -14,6 +14,9 @@ This document summarizes the basic coding style used in this repository and how 
 ### Zig
 - Format all Zig files with `zig fmt`.
 
+### Racket
+- Use `raco fmt` for formatting. Run `raco fmt <file>` before committing.
+
 ## Running Tests
 
 ### Haskell
@@ -40,6 +43,14 @@ cd zig
 zig build
 ```
 
+### Racket
+Generate the assembly output by running:
+
+```bash
+cd racket
+racket main.rkt
+```
+
 ## Multi-Language Workflow
 
-This project coordinates changes across the Haskell, Rust and Zig implementations. See `AGENTS.md` in the repository root for details on how updates should flow between these directories.
+This project coordinates changes across the Haskell, Rust, Zig and Racket implementations. See `AGENTS.md` in the repository root for details on how updates should flow between these directories.

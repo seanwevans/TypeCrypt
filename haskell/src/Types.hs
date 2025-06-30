@@ -64,6 +64,7 @@ encrypt ty plaintext =
       nonce = case C.nonce12 (B.replicate 12 0) of
         CryptoFailed _ -> error "invalid nonce"
         CryptoPassed n -> n
+
       st1 = throwCryptoError $ C.initialize key nonce
       st2 = C.finalizeAAD st1
       (out, st3) = C.encrypt plaintext st2
@@ -72,6 +73,7 @@ encrypt ty plaintext =
 
 -- | Decrypt if the value matches the expected type and authentication tag checks.
 decrypt :: Type a -> Value -> ByteString -> Maybe ByteString
+
 decrypt ty val input
   | not (matches val ty) = Nothing
   | B.length input < 16 = Nothing
