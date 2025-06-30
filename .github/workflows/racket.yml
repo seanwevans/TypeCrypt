@@ -1,0 +1,24 @@
+name: Racket CI
+
+on:
+  push:
+    paths:
+      - 'racket/**'
+  pull_request:
+    paths:
+      - 'racket/**'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: racket
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup Racket
+        uses: Bogdanp/setup-racket@v1
+        with:
+          version: '8.17'
+      - name: Run Racket script
+        run: racket main.rkt
