@@ -1,0 +1,24 @@
+name: Rust CI
+
+on:
+  push:
+    paths:
+      - 'rust/**'
+  pull_request:
+    paths:
+      - 'rust/**'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: rust
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+      - name: Test
+        run: cargo test --verbose
