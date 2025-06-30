@@ -84,3 +84,9 @@ main = hspec $ do
       property $ \(n :: Int) bs -> ioProperty $ do
         ct <- encrypt TInt bs
         pure $ decrypt TString (V TInt n) ct == Nothing
+
+    it "fails to decrypt when ciphertext is truncated" $
+      property $ \(n :: Int) (bs :: ByteString) -> ioProperty $ do
+        ct <- encrypt TInt bs
+        let truncated = B.take (B.length ct - 1) ct
+        pure $ decrypt TInt (V TInt n) truncated == Nothing
