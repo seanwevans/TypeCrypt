@@ -35,6 +35,7 @@ pub fn matches(value: &Value, ty: &Type) -> bool {
 
 
 use ring::aead;
+use ring::rand::{SecureRandom, SystemRandom};
 
 fn key_from_type(ty: &Type) -> aead::LessSafeKey {
     let bytes: [u8; 32] = match ty {
@@ -52,11 +53,16 @@ fn key_from_type(ty: &Type) -> aead::LessSafeKey {
 /// Encrypt the given plaintext using the provided `Type` as the key.
 pub fn encrypt(ty: &Type, plaintext: &[u8]) -> Vec<u8> {
     let key = key_from_type(ty);
-    let nonce = aead::Nonce::assume_unique_for_key([0u8; 12]);
+    let rng = SystemRandom::new();
+    let mut nonce_bytes = [0u8; 12];
+    rng.fill(&mut nonce_bytes).expect("random failure");
+    let nonce = aead::Nonce::assume_unique_for_key(nonce_bytes);
     let mut in_out = plaintext.to_vec();
     key.seal_in_place_append_tag(nonce, aead::Aad::empty(), &mut in_out)
         .expect("encryption failure");
-    in_out
+    let mut out = nonce_bytes.to_vec();
+    out.extend_from_slice(&in_out);
+    out
 }
 
 /// Decrypt the ciphertext if the value matches the expected type.
@@ -68,9 +74,14 @@ pub fn decrypt_with_value(
     if !matches(value, ty) {
         return None;
     }
+    if ciphertext.len() < 12 {
+        return None;
+    }
     let key = key_from_type(ty);
-    let nonce = aead::Nonce::assume_unique_for_key([0u8; 12]);
-    let mut in_out = ciphertext.to_vec();
+    let mut nonce_bytes = [0u8; 12];
+    nonce_bytes.copy_from_slice(&ciphertext[..12]);
+    let nonce = aead::Nonce::assume_unique_for_key(nonce_bytes);
+    let mut in_out = ciphertext[12..].to_vec();
     let result = key.open_in_place(nonce, aead::Aad::empty(), &mut in_out).ok()?;
     Some(result.to_vec())
 }
@@ -126,5 +137,15 @@ mod tests {
         let v = Value::List(vec![Value::Int(1), Value::Int(2)]);
         let t = Type::List(Box::new(Type::Int));
         assert!(matches(&v, &t));
+
+    #[test]
+    fn multiple_encryptions_use_different_nonces() {
+        let ty = Type::Int;
+        let value = Value::Int(7);
+        let ct1 = encrypt(&ty, b"hello");
+        let ct2 = encrypt(&ty, b"hello");
+        assert_ne!(ct1, ct2);
+        assert_eq!(decrypt_with_value(&ty, &value, &ct1).unwrap(), b"hello");
+        assert_eq!(decrypt_with_value(&ty, &value, &ct2).unwrap(), b"hello");
     }
 }
