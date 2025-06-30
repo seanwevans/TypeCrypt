@@ -1,0 +1,9 @@
+# Ignore build artifacts
+rust/target/
+**/target/
+**/.stack-work/
+**/dist-newstyle/
+*.hi
+*.o
+*.beam
+*.swp
