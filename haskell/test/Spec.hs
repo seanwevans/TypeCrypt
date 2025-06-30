@@ -90,3 +90,15 @@ main = hspec $ do
         ct <- encrypt TInt bs
         let truncated = B.take (B.length ct - 1) ct
         pure $ decrypt TInt (V TInt n) truncated == Nothing
+
+  describe "key derivation" $ do
+    it "key derivation is deterministic" $ do
+      let ty = TList TInt
+          k1 = keyFromType ty
+          k2 = keyFromType ty
+      k1 `shouldBe` k2
+
+    it "different types yield different keys" $ do
+      let k1 = keyFromType TInt
+          k2 = keyFromType TString
+      k1 `shouldNotBe` k2

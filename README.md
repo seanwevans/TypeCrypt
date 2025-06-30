@@ -17,7 +17,7 @@ In TypeCrypt, types are not just annotations — they are *structural constraint
 
 This flips conventional cryptography on its head: instead of using values to unlock data, you must *satisfy a type* to access it.
 
-Each implementation derives a symmetric key directly from a `Type` using the `keyFromType` function.  Haskell still maps each constructor to a fixed 32‑byte key, while the Rust branch now hashes a canonical byte encoding of the type with SHA‑256.  Data is encrypted with ChaCha20‑Poly1305 and the `encrypt` function prepends a random nonce to the ciphertext.  `decrypt` verifies that a provided `Value` matches the expected `Type` before attempting to decrypt.  Although the key derivation is still simplistic and **not** ready for real use, it demonstrates the idea of tying access to type satisfaction.
+Each implementation derives a symmetric key directly from a `Type` using the `keyFromType` function.  Both the Haskell and Rust branches now hash a canonical byte encoding of the type with SHA‑256.  Data is encrypted with ChaCha20‑Poly1305 and the `encrypt` function prepends a random nonce to the ciphertext.  `decrypt` verifies that a provided `Value` matches the expected `Type` before attempting to decrypt.  Although the key derivation is still simplistic and **not** ready for real use, it demonstrates the idea of tying access to type satisfaction.
 
 ## Development Workflow
 

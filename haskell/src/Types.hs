@@ -5,11 +5,13 @@ module Types where
 
 import qualified Crypto.Cipher.ChaChaPoly1305 as C
 import Crypto.Error (CryptoFailable (..), throwCryptoError)
+import Crypto.Hash (Digest, SHA256, hash)
 import Crypto.MAC.Poly1305 (authTag)
 import Crypto.Random (getRandomBytes)
 import Data.ByteArray (convert)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as B
+import Data.Word (Word8)
 
 -- | Type algebra using GADTs.
 -- Each constructor carries the concrete type it represents.
@@ -50,13 +52,20 @@ sameType (TPair a1 b1) (TPair a2 b2) = sameType a1 a2 && sameType b1 b2
 sameType (TList t1) (TList t2) = sameType t1 t2
 sameType _ _ = False
 
+-- | Produce the canonical byte encoding of a 'Type'.
+canonicalBytes :: Type a -> ByteString
+canonicalBytes t = B.pack (go t)
+  where
+    go :: Type b -> [Word8]
+    go TInt = [0]
+    go TString = [1]
+    go TBool = [2]
+    go (TPair a b) = 3 : go a ++ go b
+    go (TList ty) = 4 : go ty
+
 -- | Internal: derive a symmetric key from a 'Type'.
 keyFromType :: Type a -> B.ByteString
-keyFromType TInt = B.replicate 32 0
-keyFromType TString = B.replicate 32 1
-keyFromType TBool = B.replicate 32 2
-keyFromType (TPair _ _) = B.replicate 32 3
-keyFromType (TList _) = B.replicate 32 4
+keyFromType ty = convert (hash (canonicalBytes ty) :: Digest SHA256)
 
 encrypt :: Type a -> ByteString -> IO ByteString
 encrypt ty plaintext = do
