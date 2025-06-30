@@ -1,17 +1,20 @@
 const std = @import("std");
 
-/// Experimental compile-time type enumeration.
-/// Mirrors the "Type" variants from other implementations.
-pub const Type = enum {
-    Int,
-    Str,
-    Bool,
-    Pair,
-    List,
+/// Runtime representation of a Type.
+/// This mirrors the Rust `Type` enum and allows
+/// nested structures to describe pairs and lists.
+pub const Tag = enum { Int, Str, Bool, Pair, List };
+
+pub const Type = union(Tag) {
+    Int: void,
+    Str: void,
+    Bool: void,
+    Pair: struct { a: *const Type, b: *const Type },
+    List: *const Type,
 };
 
-/// A value tagged with its Type.
-pub const Value = union(Type) {
+/// A runtime value tagged with a `Tag`.
+pub const Value = union(Tag) {
     Int: i32,
     Str: []const u8,
     Bool: bool,
@@ -31,8 +34,25 @@ pub fn typeHash(comptime T: type) u64 {
 }
 
 /// Determine if a `Value` matches a particular `Type`.
-pub fn matches(v: Value, t: Type) bool {
-    return std.meta.activeTag(v) == t;
+pub fn matches(v: Value, expected: Type) bool {
+    switch (expected) {
+        .Int => return std.meta.activeTag(v) == .Int,
+        .Str => return std.meta.activeTag(v) == .Str,
+        .Bool => return std.meta.activeTag(v) == .Bool,
+        .Pair => |pt| {
+            if (std.meta.activeTag(v) != .Pair) return false;
+            const val = v.Pair;
+            return matches(val.a, pt.a.*) and matches(val.b, pt.b.*);
+        },
+        .List => |elem_ty| {
+            if (std.meta.activeTag(v) != .List) return false;
+            const slice = v.List;
+            for (slice) |item| {
+                if (!matches(item, elem_ty.*)) return false;
+            }
+            return true;
+        },
+    }
 }
 
 pub fn main() void {
@@ -54,15 +74,22 @@ test "typeHash distinct" {
 }
 
 test "matches basic" {
-    try std.testing.expect(matches(Value{ .Int = 1 }, .Int));
-    try std.testing.expect(!matches(Value{ .Str = "hi" }, .Int));
+    try std.testing.expect(matches(Value{ .Int = 1 }, Type{ .Int = {} }));
+    try std.testing.expect(!matches(Value{ .Str = "hi" }, Type{ .Int = {} }));
 }
 
-test "matches pair and list" {
-    const pair = Value{ .Pair = .{ .a = Value{ .Int = 1 }, .b = Value{ .Bool = true } } };
-    try std.testing.expect(matches(pair, .Pair));
+test "matches_pair" {
+    const int_ty = Type{ .Int = {} };
+    const str_ty = Type{ .Str = {} };
+    const pair_ty = Type{ .Pair = .{ .a = &int_ty, .b = &str_ty } };
+    const v = Value{ .Pair = .{ .a = Value{ .Int = 1 }, .b = Value{ .Str = "a" } } };
+    try std.testing.expect(matches(v, pair_ty));
+}
 
+test "matches_list" {
+    const int_ty = Type{ .Int = {} };
+    const list_ty = Type{ .List = &int_ty };
     const arr = [_]Value{ Value{ .Int = 1 }, Value{ .Int = 2 } };
     const lst = Value{ .List = arr[0..] };
-    try std.testing.expect(matches(lst, .List));
+    try std.testing.expect(matches(lst, list_ty));
 }
