@@ -18,18 +18,6 @@ This flips conventional cryptography on its head: instead of using values to unl
 
 ---
 
-## 📂 Directory Structure
-
-```text
-typecrypt/
-├── haskell/      # Formal logic + type algebra
-├── rust/         # Hardened production implementation
-├── zig/          # Compile-time experimental version
-├── docs/         # Design documents and notes
-```
-
----
-
 ## 🧠 Example (Abstract)
 
 ```haskell
