@@ -17,3 +17,9 @@ main = hspec $ do
     it "roundtrips for String" $ property $ \(s :: String) bs ->
       let ct = encrypt TString bs
        in decrypt TString (V TString s) ct == Just bs
+    it "matches Bool" $ property $ \b ->
+      matches (V TBool b) TBool
+    it "matches Pair" $ property $ \a b ->
+      matches (V (TPair TInt TString) (a,b)) (TPair TInt TString)
+    it "matches List" $ property $ \xs ->
+      matches (V (TList TInt) xs) (TList TInt)
