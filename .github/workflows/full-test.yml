@@ -1,0 +1,48 @@
+name: Full Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    paths:
+      - '*/**'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Haskell
+        uses: haskell/actions/setup@v2
+        with:
+          ghc-version: '9.2'
+      - name: Cache cabal store
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cabal/store
+            haskell/dist-newstyle
+          key: ${{ runner.os }}-cabal-${{ hashFiles('haskell/cabal.project', 'haskell/**/*.cabal') }}
+          restore-keys: ${{ runner.os }}-cabal-
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+      - name: Cache cargo
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('rust/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-
+      - uses: goto-bus-stop/setup-zig@v1
+        with:
+          version: 0.11.0
+      - name: Setup Racket
+        uses: Bogdanp/setup-racket@v1.14
+        with:
+          version: '8.17'
+      - name: Run all tests
+        run: ./run_all_tests.sh
