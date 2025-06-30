@@ -69,3 +69,12 @@ main = hspec $ do
         let t = TList TInt
         ct <- encrypt t bs
         pure $ decrypt t (V t xs) ct == Just bs
+      let t = TList TInt
+          ct = encrypt t bs
+       in decrypt t (V t xs) ct == Just bs
+    it "multiple encryptions use different nonces" $
+      property $ \(bs :: ByteString) -> ioProperty $ do
+        let ty = TInt
+            ct1 = encrypt ty bs
+            ct2 = encrypt ty bs
+        pure (ct1 /= ct2)
