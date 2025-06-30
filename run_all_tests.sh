@@ -5,3 +5,4 @@ set -e
 ( cd haskell && cabal test )
 ( cd rust && cargo test )
 ( cd zig && zig build )
+( cd racket && racket main.rkt )
