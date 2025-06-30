@@ -36,3 +36,14 @@ pub fn main() void {
     std.debug.print("int hash: {x}\n", .{int_hash});
     std.debug.print("str hash: {x}\n", .{str_hash});
 }
+
+/// Basic unit tests for typeHash
+
+test "typeHash stable" {
+    const val = typeHash(i32);
+    try std.testing.expectEqual(val, typeHash(i32));
+}
+
+test "typeHash distinct" {
+    try std.testing.expect(typeHash(i32) != typeHash([]const u8));
+}

@@ -25,10 +25,8 @@ pub fn matches(value: &Value, ty: &Type) -> bool {
         (Value::Int(_), Type::Int) => true,
         (Value::Str(_), Type::Str) => true,
         (Value::Bool(_), Type::Bool) => true,
-        (Value::Pair(a, b), Type::Pair(ta, tb)) =>
-            matches(a, ta) && matches(b, tb),
-        (Value::List(vals), Type::List(t)) =>
-            vals.iter().all(|v| matches(v, t)),
+        (Value::Pair(a, b), Type::Pair(ta, tb)) => matches(a, ta) && matches(b, tb),
+        (Value::List(vals), Type::List(t)) => vals.iter().all(|v| matches(v, t)),
         _ => false,
     }
 }

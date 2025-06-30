@@ -36,19 +36,19 @@ cargo test
 ```
 
 ### Zig
-The Zig example currently just builds an executable. Run:
+Run the Zig unit tests via the build system:
 
 ```bash
 cd zig
-zig build
+zig build test
 ```
 
 ### Racket
-Generate the assembly output by running:
+Execute the rackunit tests:
 
 ```bash
 cd racket
-racket main.rkt
+raco test test.rkt
 ```
 
 ## Multi-Language Workflow
