@@ -7,4 +7,9 @@ This directory contains the formal specification and type logic implementation.
 - `test/Spec.hs` contains QuickCheck properties.
  - Future modules will build on this to implement symbolic matching and encryption logic.
 
-Run `cabal test` to execute the QuickCheck suite.
+To build and test this implementation:
+
+```bash
+cabal build
+cabal test
+```
