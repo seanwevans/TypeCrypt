@@ -15,3 +15,7 @@ This repo contains three coordinated implementations:
 In TypeCrypt, types are not just annotations — they are *structural constraints* that serve as decryption keys. A ciphertext encrypted under a type `T` can only be decrypted by a value of type `T`.
 
 This flips conventional cryptography on its head: instead of using values to unlock data, you must *satisfy a type* to access it.
+
+## License
+
+TypeCrypt is released under the [MIT License](LICENSE).
