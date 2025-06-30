@@ -87,7 +87,7 @@ pub fn decrypt_with_value(ty: &Type, value: &Value, ciphertext: &[u8]) -> Option
     if !matches(value, ty) {
         return None;
     }
-    if ciphertext.len() < 12 {
+    if ciphertext.len() < 12 + aead::CHACHA20_POLY1305.tag_len() {
         return None;
     }
     let key = key_from_type(ty);
