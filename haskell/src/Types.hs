@@ -61,7 +61,10 @@ keyFromType (TList _) = B.replicate 32 4
 encrypt :: Type a -> ByteString -> ByteString
 encrypt ty plaintext =
   let key = keyFromType ty
-      nonce = either (error "invalid nonce") id $ C.nonce12 (B.replicate 12 0)
+      nonce = case C.nonce12 (B.replicate 12 0) of
+        CryptoFailed _ -> error "invalid nonce"
+        CryptoPassed n -> n
+
       st1 = throwCryptoError $ C.initialize key nonce
       st2 = C.finalizeAAD st1
       (out, st3) = C.encrypt plaintext st2
@@ -77,7 +80,9 @@ decrypt ty val input
   | otherwise =
       let (ct, tagBytes) = B.splitAt (B.length input - 16) input
           key = keyFromType ty
-          nonce = either (error "invalid nonce") id $ C.nonce12 (B.replicate 12 0)
+          nonce = case C.nonce12 (B.replicate 12 0) of
+            CryptoFailed _ -> error "invalid nonce"
+            CryptoPassed n -> n
           st1 = throwCryptoError $ C.initialize key nonce
           st2 = C.finalizeAAD st1
           (pt, st3) = C.decrypt ct st2
