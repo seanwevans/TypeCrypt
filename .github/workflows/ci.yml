@@ -37,3 +37,14 @@ jobs:
         with:
           version: 0.11.0
       - run: zig version
+
+  racket:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: Bogdanp/setup-racket@v1
+        with:
+          version: '8.17'
+      - run: |
+          cd racket
+          racket main.rkt
