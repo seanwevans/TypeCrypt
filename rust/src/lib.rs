@@ -22,7 +22,6 @@ pub fn matches(value: &Value, ty: &Type) -> bool {
     }
 }
 
-
 use ring::aead;
 use ring::rand::{SecureRandom, SystemRandom};
 
@@ -31,8 +30,7 @@ fn key_from_type(ty: &Type) -> aead::LessSafeKey {
         Type::Int => [0u8; 32],
         Type::Str => [1u8; 32],
     };
-    let unbound = aead::UnboundKey::new(&aead::CHACHA20_POLY1305, &bytes)
-        .expect("invalid key");
+    let unbound = aead::UnboundKey::new(&aead::CHACHA20_POLY1305, &bytes).expect("invalid key");
     aead::LessSafeKey::new(unbound)
 }
 
@@ -52,11 +50,7 @@ pub fn encrypt(ty: &Type, plaintext: &[u8]) -> Vec<u8> {
 }
 
 /// Decrypt the ciphertext if the value matches the expected type.
-pub fn decrypt_with_value(
-    ty: &Type,
-    value: &Value,
-    ciphertext: &[u8],
-) -> Option<Vec<u8>> {
+pub fn decrypt_with_value(ty: &Type, value: &Value, ciphertext: &[u8]) -> Option<Vec<u8>> {
     if !matches(value, ty) {
         return None;
     }
@@ -68,7 +62,9 @@ pub fn decrypt_with_value(
     nonce_bytes.copy_from_slice(&ciphertext[..12]);
     let nonce = aead::Nonce::assume_unique_for_key(nonce_bytes);
     let mut in_out = ciphertext[12..].to_vec();
-    let result = key.open_in_place(nonce, aead::Aad::empty(), &mut in_out).ok()?;
+    let result = key
+        .open_in_place(nonce, aead::Aad::empty(), &mut in_out)
+        .ok()?;
     Some(result.to_vec())
 }
 

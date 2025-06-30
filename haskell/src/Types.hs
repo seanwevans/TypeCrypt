@@ -1,5 +1,6 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE StandaloneDeriving #-}
+
 module Types where
 
 import Data.ByteString (ByteString)
@@ -7,11 +8,11 @@ import Data.ByteString (ByteString)
 -- | Type algebra using GADTs.
 -- Each constructor carries the concrete type it represents.
 data Type a where
-  TInt   :: Type Int
+  TInt :: Type Int
   TString :: Type String
-  TBool  :: Type Bool
-  TPair  :: Type a -> Type b -> Type (a, b)
-  TList  :: Type a -> Type [a]
+  TBool :: Type Bool
+  TPair :: Type a -> Type b -> Type (a, b)
+  TList :: Type a -> Type [a]
 
 -- Show instance for existential 'Type'
 deriving instance Show (Type a)
@@ -23,9 +24,9 @@ data Value where
 
 -- Show instance for 'Value'
 instance Show Value where
-  show (V TInt n)      = "VInt " ++ show n
-  show (V TString s)   = "VString " ++ show s
-  show (V TBool b)     = "VBool " ++ show b
+  show (V TInt n) = "VInt " ++ show n
+  show (V TString s) = "VString " ++ show s
+  show (V TBool b) = "VBool " ++ show b
   show (V (TPair _ _) _) = "VPair"
   show (V (TList _) _) = "VList"
 
@@ -52,4 +53,4 @@ encrypt _ bs = bs
 decrypt :: Type a -> Value -> ByteString -> Maybe ByteString
 decrypt t v bs
   | matches v t = Just bs
-  | otherwise   = Nothing
+  | otherwise = Nothing
