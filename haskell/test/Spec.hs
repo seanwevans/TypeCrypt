@@ -92,6 +92,15 @@ main = hspec $ do
         pure $ decrypt TInt (V TInt n) truncated == Nothing
 
   describe "key derivation" $ do
+    it "key derivation is deterministic" $ do
+      let ty = TList TInt
+          k1 = keyFromType ty
+          k2 = keyFromType ty
+      k1 `shouldBe` k2
+    it "different types yield different keys" $ do
+      let k1 = keyFromType TInt
+          k2 = keyFromType TString
+      k1 `shouldNotBe` k2
     it "derive_key_deterministic" $
       property $
         let ty = TList TInt
