@@ -43,7 +43,7 @@ Each language implementation lives in its own subdirectory. To compile and verif
 - **Zig**
   ```bash
   cd zig
-  zig build
+  zig build test
   ```
 - **Racket**
   ```bash

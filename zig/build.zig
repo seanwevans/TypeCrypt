@@ -13,9 +13,11 @@ pub fn build(b: *std.Build) void {
 
     b.installArtifact(exe);
 
-    const tests = b.addTest("src/main.zig");
-    tests.setTarget(target);
-    tests.setBuildMode(mode);
+    const tests = b.addTest(.{
+        .root_source_file = .{ .path = "src/main.zig" },
+        .target = target,
+        .optimize = mode,
+    });
     const run_tests = b.addRunArtifact(tests);
     b.step("test", "Run unit tests").dependOn(&run_tests.step);
 }
