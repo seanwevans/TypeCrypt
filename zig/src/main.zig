@@ -5,12 +5,18 @@ const std = @import("std");
 pub const Type = enum {
     Int,
     Str,
+    Bool,
+    Pair,
+    List,
 };
 
 /// A value tagged with its Type.
 pub const Value = union(Type) {
     Int: i32,
     Str: []const u8,
+    Bool: bool,
+    Pair: struct { a: Value, b: Value },
+    List: []Value,
 };
 
 /// Compute a compile-time hash of a Zig type.
