@@ -3,12 +3,13 @@ name: typecrypt
 version: 0.1.0.0
 build-type: Simple
 
-default-language: Haskell2010
-
 library
   exposed-modules: Types
   hs-source-dirs: src
-  build-depends: base >=4.7 && <5
+  build-depends:
+      base >=4.7 && <5,
+      bytestring >=0.10
+  default-language: Haskell2010
 
 test-suite spec
   type: exitcode-stdio-1.0
@@ -17,5 +18,7 @@ test-suite spec
   build-depends:
       base >=4.7 && <5,
       typecrypt,
-      QuickCheck >=2.14
+      bytestring,
+      QuickCheck,
+      hspec >=2.7
   default-language: Haskell2010
