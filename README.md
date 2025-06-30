@@ -16,12 +16,34 @@ In TypeCrypt, types are not just annotations — they are *structural constraint
 
 This flips conventional cryptography on its head: instead of using values to unlock data, you must *satisfy a type* to access it.
 
----
-
 ## Development Workflow
 
 Coding style guidelines and test commands for each implementation are documented in [docs/development.md](docs/development.md). Consult that file for instructions on formatting Haskell, Rust, and Zig code as well as how to run each test suite.
 
 For details on how changes should propagate between the theory, production, and experimental branches, read [AGENTS.md](AGENTS.md).
 
+## Building & Testing
+
+Each language implementation lives in its own subdirectory. To compile and verify them run:
+
+- **Haskell**
+  ```bash
+  cd haskell
+  cabal build
+  cabal test
+  ```
+- **Rust**
+  ```bash
+  cd rust
+  cargo test
+  ```
+- **Zig**
+  ```bash
+  cd zig
+  zig build
+  ```
+
+## License
+
+TypeCrypt is released under the [MIT License](LICENSE).
 
