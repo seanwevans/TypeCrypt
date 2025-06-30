@@ -5,6 +5,8 @@
 (struct Type (name) #:transparent)
 (struct Value (type val) #:transparent)
 
+(provide Type Value TInt matches emit-add)
+
 (define TInt (Type 'int))
 
 ;; Check if a Value matches a Type
