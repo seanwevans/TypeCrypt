@@ -43,6 +43,12 @@ Each language implementation lives in its own subdirectory. To compile and verif
   zig build
   ```
 
+For convenience, you can run all of the above with:
+
+```bash
+./run_all_tests.sh
+```
+
 ## License
 
 TypeCrypt is released under the [MIT License](LICENSE).
