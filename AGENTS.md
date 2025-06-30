@@ -2,6 +2,12 @@
 
 This document describes how autonomous agents (AI assistants, CI agents, automated verifiers, etc.) should interact with the TypeCrypt project.
 
+## 🛠 General Workflow
+
+- Format code according to `docs/development.md`.
+- Run `./run_all_tests.sh` before committing.
+- Include the agent name in commit messages.
+
 ---
 
 ## 🤖 Agent Classes & Roles
@@ -66,6 +72,11 @@ This document describes how autonomous agents (AI assistants, CI agents, automat
   "timestamp": "2025-06-30T18:00:00Z"
 }
 ```
+
+## 🛠 Workflow Checklist
+
+- Ensure all code compiles by running `./run_all_tests.sh`.
+- Record results in your JSONL log entry.
 
 ---
 
