@@ -70,6 +70,7 @@ encrypt ty plaintext =
 
 -- | Decrypt if the value matches the expected type and authentication tag checks.
 decrypt :: Type a -> Value -> ByteString -> Maybe ByteString
+
 decrypt ty val input
   | not (matches val ty) = Nothing
   | B.length input < 16 = Nothing

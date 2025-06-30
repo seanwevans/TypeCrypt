@@ -1,6 +1,6 @@
 # TypeCrypt: Roadmap
 
-This document outlines the plan for developing TypeCrypt across the three branches: Theory (Haskell), Production (Rust), and Experimental (Zig).
+This document outlines the plan for developing TypeCrypt across four branches: Theory (Haskell), Production (Rust), Experimental (Zig), and Assembly (Racket).
 
 ---
 
@@ -50,6 +50,17 @@ This document outlines the plan for developing TypeCrypt across the three branch
 
 ---
 
+### 🟣 Racket (Assembly Branch)
+
+> _Purpose_: Explore direct assembly generation and low-level optimizations.
+
+**Goals:**
+- [ ] Emit minimal x86_64 assembly for sample operations
+- [ ] Provide a test harness for verifying generated code
+- [ ] Integrate with other branches via shared IR
+
+---
+
 ## 🧮 Long-Term Goals
 
 - [ ] Transpile Haskell IR to:
@@ -69,6 +80,7 @@ This document outlines the plan for developing TypeCrypt across the three branch
 - Haskell drives spec and logic
 - Rust implements hardened infrastructure
 - Zig tests radical or low-level enhancements
+- Racket explores direct assembly generation
 
 Each branch feeds into the others iteratively to improve correctness, performance, and flexibility.
 
