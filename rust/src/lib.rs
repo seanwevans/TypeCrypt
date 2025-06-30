@@ -137,6 +137,7 @@ mod tests {
         let v = Value::List(vec![Value::Int(1), Value::Int(2)]);
         let t = Type::List(Box::new(Type::Int));
         assert!(matches(&v, &t));
+    }
 
     #[test]
     fn multiple_encryptions_use_different_nonces() {
