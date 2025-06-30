@@ -97,8 +97,14 @@ main = hspec $ do
           k1 = keyFromType ty
           k2 = keyFromType ty
       k1 `shouldBe` k2
-
     it "different types yield different keys" $ do
       let k1 = keyFromType TInt
           k2 = keyFromType TString
       k1 `shouldNotBe` k2
+    it "derive_key_deterministic" $
+      property $
+        let ty = TList TInt
+         in keyFromType ty == keyFromType ty
+    it "derive_key_distinct" $
+      property $
+        keyFromType TInt /= keyFromType TString
