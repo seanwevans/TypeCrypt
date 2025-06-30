@@ -30,6 +30,11 @@ pub fn typeHash(comptime T: type) u64 {
     return hash;
 }
 
+/// Determine if a `Value` matches a particular `Type`.
+pub fn matches(v: Value, t: Type) bool {
+    return std.meta.activeTag(v) == t;
+}
+
 pub fn main() void {
     const int_hash = typeHash(i32);
     const str_hash = typeHash([]const u8);
@@ -37,7 +42,7 @@ pub fn main() void {
     std.debug.print("str hash: {x}\n", .{str_hash});
 }
 
-/// Basic unit tests for typeHash
+// Basic unit tests for typeHash
 
 test "typeHash stable" {
     const val = typeHash(i32);
@@ -46,4 +51,18 @@ test "typeHash stable" {
 
 test "typeHash distinct" {
     try std.testing.expect(typeHash(i32) != typeHash([]const u8));
+}
+
+test "matches basic" {
+    try std.testing.expect(matches(Value{ .Int = 1 }, .Int));
+    try std.testing.expect(!matches(Value{ .Str = "hi" }, .Int));
+}
+
+test "matches pair and list" {
+    const pair = Value{ .Pair = .{ .a = Value{ .Int = 1 }, .b = Value{ .Bool = true } } };
+    try std.testing.expect(matches(pair, .Pair));
+
+    const arr = [_]Value{ Value{ .Int = 1 }, Value{ .Int = 2 } };
+    const lst = Value{ .List = arr[0..] };
+    try std.testing.expect(matches(lst, .List));
 }
