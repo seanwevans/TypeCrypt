@@ -20,5 +20,7 @@ jobs:
         with:
           toolchain: stable
           override: true
+      - name: Format
+        run: cargo fmt -- --check
       - name: Test
         run: cargo test --verbose
