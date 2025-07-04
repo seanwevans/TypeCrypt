@@ -1,5 +1,6 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 
+import Data.Bits (xor)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as B
 import Test.Hspec
@@ -90,6 +91,13 @@ main = hspec $ do
         ct <- encrypt TInt bs
         let truncated = B.take (B.length ct - 1) ct
         pure $ decrypt TInt (V TInt n) truncated == Nothing
+
+    it "fails to decrypt when ciphertext is tampered" $
+      property $ \(n :: Int) (bs :: ByteString) -> ioProperty $ do
+        ct <- encrypt TInt bs
+        let first = B.index ct 0
+            tampered = B.cons (first `xor` 1) (B.drop 1 ct)
+        pure $ decrypt TInt (V TInt n) tampered == Nothing
 
   describe "key derivation" $ do
     it "key derivation is deterministic" $ do
