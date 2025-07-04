@@ -22,6 +22,41 @@ pub const Value = union(Tag) {
     List: []Value,
 };
 
+/// Produce the canonical byte encoding of a `Type`.
+pub fn canonicalBytes(allocator: std.mem.Allocator, ty: Type) ![]u8 {
+    var list = std.ArrayList(u8).init(allocator);
+    try canonicalBytesImpl(ty, &list);
+    return list.toOwnedSlice();
+}
+
+fn canonicalBytesImpl(ty: Type, list: *std.ArrayList(u8)) !void {
+    switch (ty) {
+        .Int => try list.append(0),
+        .Str => try list.append(1),
+        .Bool => try list.append(2),
+        .Pair => |p| {
+            try list.append(3);
+            try canonicalBytesImpl(p.a.*, list);
+            try canonicalBytesImpl(p.b.*, list);
+        },
+        .List => |elem| {
+            try list.append(4);
+            try canonicalBytesImpl(elem.*, list);
+        },
+    }
+}
+
+/// Derive a 32-byte key by hashing the canonical bytes with SHA-256.
+pub fn deriveKey(allocator: std.mem.Allocator, ty: Type) ![32]u8 {
+    const bytes = try canonicalBytes(allocator, ty);
+    defer allocator.free(bytes);
+    var hasher = std.crypto.sha2.Sha256.init(.{});
+    hasher.update(bytes);
+    var out: [32]u8 = undefined;
+    hasher.final(out[0..]);
+    return out;
+}
+
 /// Compute a compile-time hash of a Zig type.
 /// Currently uses a simple FNV-1a hash of the type name.
 pub fn typeHash(comptime T: type) u64 {
@@ -92,4 +127,35 @@ test "matches_list" {
     const arr = [_]Value{ Value{ .Int = 1 }, Value{ .Int = 2 } };
     const lst = Value{ .List = arr[0..] };
     try std.testing.expect(matches(lst, list_ty));
+}
+
+test "canonicalBytes_int" {
+    var gpa = std.testing.allocator;
+    const bytes = try canonicalBytes(gpa, Type{ .Int = {} });
+    defer gpa.free(bytes);
+    try std.testing.expectEqualSlices(u8, &[_]u8{0}, bytes);
+}
+
+test "canonicalBytes_pair" {
+    var gpa = std.testing.allocator;
+    const int_ty = Type{ .Int = {} };
+    const bool_ty = Type{ .Bool = {} };
+    const pair_ty = Type{ .Pair = .{ .a = &int_ty, .b = &bool_ty } };
+    const bytes = try canonicalBytes(gpa, pair_ty);
+    defer gpa.free(bytes);
+    try std.testing.expectEqualSlices(u8, &[_]u8{3, 0, 2}, bytes);
+}
+
+test "deriveKey deterministic" {
+    var gpa = std.testing.allocator;
+    const k1 = try deriveKey(gpa, Type{ .Str = {} });
+    const k2 = try deriveKey(gpa, Type{ .Str = {} });
+    try std.testing.expectEqualSlices(u8, &k1, &k2);
+}
+
+test "deriveKey_distinct" {
+    var gpa = std.testing.allocator;
+    const k1 = try deriveKey(gpa, Type{ .Int = {} });
+    const k2 = try deriveKey(gpa, Type{ .Bool = {} });
+    try std.testing.expect(!std.mem.eql(u8, &k1, &k2));
 }
