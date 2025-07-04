@@ -179,4 +179,13 @@ mod tests {
         let k2 = derive_key_bytes(&Type::Str);
         assert_ne!(k1, k2);
     }
+
+    #[test]
+    fn decrypt_fails_on_truncated_ciphertext() {
+        let ty = Type::Int;
+        let value = Value::Int(5);
+        let mut ct = encrypt(&ty, b"data");
+        ct.pop();
+        assert!(decrypt_with_value(&ty, &value, &ct).is_none());
+    }
 }
