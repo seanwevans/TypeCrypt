@@ -25,3 +25,11 @@ if command -v raco >/dev/null 2>&1; then
 else
   echo "Skipping Racket tests: raco not installed"
 fi
+
+# Cross-language key derivation consistency
+if [ -x tests/cross_lang_key_derivation.sh ]; then
+  ./tests/cross_lang_key_derivation.sh
+else
+  echo "cross_lang_key_derivation.sh not found" >&2
+  exit 1
+fi
