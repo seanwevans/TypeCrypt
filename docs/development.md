@@ -55,3 +55,7 @@ raco test test.rkt
 ## Multi-Language Workflow
 
 This project coordinates changes across the Haskell, Rust, Zig and Racket implementations. See `AGENTS.md` in the repository root for details on how updates should flow between these directories.
+
+## Continuous Integration
+
+The workflow in `.github/workflows/ci.yml` installs the Haskell, Rust, Zig and Racket toolchains and then runs `./run_all_tests.sh`. After the tests finish it writes a JSONL log entry with the pass/fail result and uploads that file as a build artifact. The log format matches the example in `AGENTS.md`.
