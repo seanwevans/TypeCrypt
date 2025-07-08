@@ -57,6 +57,15 @@ For convenience, you can run all of the above with:
 ./run_all_tests.sh
 ```
 
+To ensure that the canonical byte encoding and key derivation logic remain
+identical across the Haskell, Rust and Zig branches, run:
+
+```bash
+./tests/cross_lang_key_derivation.sh
+```
+The script builds each implementation, dumps the derived keys for a small set of
+example `Type`s and fails if any implementation diverges.
+
 ## License
 
 TypeCrypt is released under the [MIT License](LICENSE).
