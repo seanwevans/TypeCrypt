@@ -52,6 +52,19 @@ cd racket
 raco test test.rkt
 ```
 
+## Toolchain Requirements for `run_all_tests.sh`
+
+The `./run_all_tests.sh` script orchestrates all test suites and expects the
+following executables to be available in your `PATH`:
+
+- `cabal` – Haskell build tool
+- `cargo` – Rust package manager
+- `zig` – Zig compiler
+- `raco` – Racket command runner
+
+If any of these tools are missing the corresponding language tests will be
+skipped.
+
 ## Multi-Language Workflow
 
 This project coordinates changes across the Haskell, Rust, Zig and Racket implementations. See `AGENTS.md` in the repository root for details on how updates should flow between these directories.
