@@ -24,6 +24,19 @@ fi
 ( cd zig && zig build )
 
 # Run helpers
+
+# Cross-language encryption roundtrip
+PLAINTEXT="cross-test"
+HS_CT=$(cd haskell && cabal exec runghc -- -isrc ../tests/crypt_hs.hs encrypt)
+RS_CT=$(cargo run --quiet --manifest-path rust/Cargo.toml --bin crypt_tool encrypt)
+HS_DEC_RS=$(cargo run --quiet --manifest-path rust/Cargo.toml --bin crypt_tool decrypt "$HS_CT")
+RS_DEC_HS=$(cd haskell && cabal exec runghc -- -isrc ../tests/crypt_hs.hs decrypt "$RS_CT")
+if [ "$HS_DEC_RS" != "$PLAINTEXT" ] || [ "$RS_DEC_HS" != "$PLAINTEXT" ]; then
+  echo "Cross-language encryption mismatch" >&2
+  exit 1
+fi
+
+# Existing key derivation helpers
 HS_OUTPUT=$(cd haskell && cabal exec runghc -- -isrc ../tests/dump_hs.hs)
 RS_OUTPUT=$(cargo run --quiet --manifest-path rust/Cargo.toml --bin dump_keys)
 ZIG_OUTPUT=$(zig run tests/dump_zig.zig)
