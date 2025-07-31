@@ -8,7 +8,7 @@ import Crypto.Error (CryptoFailable (..), throwCryptoError)
 import Crypto.Hash (Digest, SHA256, hash)
 import Crypto.MAC.Poly1305 (authTag)
 import Crypto.Random (getRandomBytes)
-import Data.ByteArray (convert)
+import Data.ByteArray (constEq, convert)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as B
 import Data.Word (Word8)
@@ -98,4 +98,4 @@ decrypt ty val input
           tag = C.finalize st3
        in case authTag tagBytes of
             CryptoFailed _ -> Nothing
-            CryptoPassed t -> if t == tag then Just pt else Nothing
+            CryptoPassed t -> if constEq t tag then Just pt else Nothing
