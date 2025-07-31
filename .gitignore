@@ -7,3 +7,6 @@ rust/target/
 *.o
 *.beam
 *.swp
+zig/zig-cache/
+zig/zig-out/
+racket/output.s
