@@ -36,10 +36,11 @@ fn canonicalBytes(allocator: std.mem.Allocator, ty: Type) ![]u8 {
 fn deriveKey(allocator: std.mem.Allocator, ty: Type) ![32]u8 {
     const bytes = try canonicalBytes(allocator, ty);
     defer allocator.free(bytes);
-    var hasher = std.crypto.sha2.Sha256.init(.{});
-    hasher.update(bytes);
+    const salt = "TypeCryptHKDFSalt";
+    const info = "TypeCryptHKDFInfo";
+    const prk = std.crypto.hkdf.HkdfSha256.extract(salt, bytes);
     var out: [32]u8 = undefined;
-    hasher.final(out[0..]);
+    std.crypto.hkdf.HkdfSha256.expand(out[0..], info, prk);
     return out;
 }
 
@@ -70,6 +71,6 @@ pub fn main() !void {
         const key_hex = std.fmt.bufPrint(&hex_buf, "{s}", .{std.fmt.fmtSliceHexLower(&key)}) catch unreachable;
         const bytes_repr = try std.fmt.allocPrint(gpa, "{any}", .{bytes});
         defer gpa.free(bytes_repr);
-        std.debug.print("{{\"type\":\"{s}\",\"bytes\":{s},\"key\":\"{s}\"}}\n", .{e.name, bytes_repr.*, key_hex});
+        std.debug.print("{{\"type\":\"{s}\",\"bytes\":{s},\"key\":\"{s}\"}}\n", .{ e.name, bytes_repr.*, key_hex });
     }
 }

@@ -1,4 +1,4 @@
-use ring::digest;
+use ring::hkdf;
 use typecrypt::Type;
 
 fn canonical_bytes(ty: &Type, out: &mut Vec<u8>) {
@@ -21,9 +21,13 @@ fn canonical_bytes(ty: &Type, out: &mut Vec<u8>) {
 fn derive_key_bytes(ty: &Type) -> [u8; 32] {
     let mut bytes = Vec::new();
     canonical_bytes(ty, &mut bytes);
-    let hash = digest::digest(&digest::SHA256, &bytes);
+    let salt = hkdf::Salt::new(hkdf::HKDF_SHA256, b"TypeCryptHKDFSalt");
+    let prk = salt.extract(&bytes);
+    let okm = prk
+        .expand(&[b"TypeCryptHKDFInfo"], hkdf::HKDF_SHA256)
+        .expect("hkdf expand");
     let mut out = [0u8; 32];
-    out.copy_from_slice(hash.as_ref());
+    okm.fill(&mut out).expect("hkdf fill");
     out
 }
 

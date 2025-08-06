@@ -46,14 +46,15 @@ fn canonicalBytesImpl(ty: Type, list: *std.ArrayList(u8)) !void {
     }
 }
 
-/// Derive a 32-byte key by hashing the canonical bytes with SHA-256.
+/// Derive a 32-byte key using HKDF-SHA256 with fixed salt and info.
 pub fn deriveKey(allocator: std.mem.Allocator, ty: Type) ![32]u8 {
     const bytes = try canonicalBytes(allocator, ty);
     defer allocator.free(bytes);
-    var hasher = std.crypto.sha2.Sha256.init(.{});
-    hasher.update(bytes);
+    const salt = "TypeCryptHKDFSalt";
+    const info = "TypeCryptHKDFInfo";
+    const prk = std.crypto.hkdf.HkdfSha256.extract(salt, bytes);
     var out: [32]u8 = undefined;
-    hasher.final(out[0..]);
+    std.crypto.hkdf.HkdfSha256.expand(out[0..], info, prk);
     return out;
 }
 
@@ -143,7 +144,7 @@ test "canonicalBytes_pair" {
     const pair_ty = Type{ .Pair = .{ .a = &int_ty, .b = &bool_ty } };
     const bytes = try canonicalBytes(gpa, pair_ty);
     defer gpa.free(bytes);
-    try std.testing.expectEqualSlices(u8, &[_]u8{3, 0, 2}, bytes);
+    try std.testing.expectEqualSlices(u8, &[_]u8{ 3, 0, 2 }, bytes);
 }
 
 test "deriveKey deterministic" {
