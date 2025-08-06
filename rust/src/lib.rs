@@ -35,7 +35,7 @@ use ring::aead;
 use ring::digest;
 use ring::rand::{SecureRandom, SystemRandom};
 
-fn canonical_bytes(ty: &Type, out: &mut Vec<u8>) {
+pub fn canonical_bytes(ty: &Type, out: &mut Vec<u8>) {
     match ty {
         Type::Int => out.push(0),
         Type::Str => out.push(1),
@@ -52,7 +52,7 @@ fn canonical_bytes(ty: &Type, out: &mut Vec<u8>) {
     }
 }
 
-fn derive_key_bytes(ty: &Type) -> [u8; 32] {
+pub fn derive_key_bytes(ty: &Type) -> [u8; 32] {
     let mut bytes = Vec::new();
     canonical_bytes(ty, &mut bytes);
     let hash = digest::digest(&digest::SHA256, &bytes);
