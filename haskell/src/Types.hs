@@ -4,13 +4,15 @@
 module Types where
 
 import qualified Crypto.Cipher.ChaChaPoly1305 as C
-import Crypto.Error (CryptoFailable (..))
-import Crypto.Hash (Digest, SHA256, hash)
+import Crypto.Error (CryptoFailable (..), throwCryptoError)
+import Crypto.Hash (SHA256)
+import Crypto.KDF.HKDF (PRK, expand, extract)
 import Crypto.MAC.Poly1305 (authTag)
 import Crypto.Random (getRandomBytes)
 import Data.ByteArray (constEq, convert)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Char8 as B8
 import Data.Word (Word8)
 
 -- | Type algebra using GADTs.
@@ -65,7 +67,13 @@ canonicalBytes t = B.pack (go t)
 
 -- | Internal: derive a symmetric key from a 'Type'.
 keyFromType :: Type a -> B.ByteString
-keyFromType ty = convert (hash (canonicalBytes ty) :: Digest SHA256)
+keyFromType ty =
+  let ikm = canonicalBytes ty
+      salt = B8.pack "TypeCryptHKDFSalt"
+      info = B8.pack "TypeCryptHKDFInfo"
+      prk :: PRK SHA256
+      prk = extract salt ikm
+   in expand prk info 32
 
 encrypt :: Type a -> ByteString -> IO (Maybe ByteString)
 encrypt ty plaintext = do
