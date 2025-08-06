@@ -14,7 +14,7 @@ fn unhex(s: &str) -> Vec<u8> {
 
 const PLAINTEXT: &[u8] = b"cross-test";
 
-fn main() {
+fn main() -> Result<(), ring::error::Unspecified> {
     let args: Vec<String> = env::args().collect();
     if args.len() < 2 {
         eprintln!("usage: encrypt|decrypt <hex>");
@@ -22,7 +22,7 @@ fn main() {
     }
     match args[1].as_str() {
         "encrypt" => {
-            let ct = encrypt(&Type::Int, PLAINTEXT);
+            let ct = encrypt(&Type::Int, PLAINTEXT)?;
             println!("{}", hex(&ct));
         }
         "decrypt" => {
@@ -33,8 +33,8 @@ fn main() {
             let ct = unhex(&args[2]);
             let val = Value::Int(0);
             match decrypt_with_value(&Type::Int, &val, &ct) {
-                Some(pt) => println!("{}", String::from_utf8_lossy(&pt)),
-                None => {
+                Ok(pt) => println!("{}", String::from_utf8_lossy(&pt)),
+                Err(_) => {
                     println!("FAIL");
                     std::process::exit(1);
                 }
@@ -45,4 +45,5 @@ fn main() {
             std::process::exit(1);
         }
     }
+    Ok(())
 }
