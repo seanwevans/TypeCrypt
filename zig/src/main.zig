@@ -50,10 +50,67 @@ fn canonicalBytesImpl(ty: Type, list: *std.ArrayList(u8)) !void {
 pub fn deriveKey(allocator: std.mem.Allocator, ty: Type) ![32]u8 {
     const bytes = try canonicalBytes(allocator, ty);
     defer allocator.free(bytes);
-    var hasher = std.crypto.sha2.Sha256.init(.{});
+    var hasher = std.crypto.hash.sha2.Sha256.init(.{});
     hasher.update(bytes);
     var out: [32]u8 = undefined;
     hasher.final(out[0..]);
+    return out;
+}
+
+/// Encrypt `plaintext` using a key derived from `ty`.
+/// Returns a newly allocated slice containing `nonce || ciphertext || tag`.
+pub fn encrypt(
+    allocator: std.mem.Allocator,
+    ty: Type,
+    plaintext: []const u8,
+) ![]u8 {
+    const aead = std.crypto.aead.chacha_poly.ChaCha20Poly1305;
+    const key = try deriveKey(allocator, ty);
+    var nonce: [aead.nonce_length]u8 = undefined;
+    std.crypto.random.bytes(nonce[0..]);
+
+    const total_len = aead.nonce_length + plaintext.len + aead.tag_length;
+    var out = try allocator.alloc(u8, total_len);
+    std.mem.copy(u8, out[0..aead.nonce_length], nonce[0..]);
+
+    var tag: [aead.tag_length]u8 = undefined;
+    aead.encrypt(
+        out[aead.nonce_length .. aead.nonce_length + plaintext.len],
+        &tag,
+        plaintext,
+        &[_]u8{},
+        nonce,
+        key,
+    );
+    std.mem.copy(u8, out[aead.nonce_length + plaintext.len ..], tag[0..]);
+    return out;
+}
+
+/// Decrypt `ciphertext` produced by `encrypt` if `value` matches `ty`.
+/// Returns `null` on authentication failure or type mismatch.
+pub fn decrypt(
+    allocator: std.mem.Allocator,
+    ty: Type,
+    value: Value,
+    ciphertext: []const u8,
+) !?[]u8 {
+    const aead = std.crypto.aead.chacha_poly.ChaCha20Poly1305;
+    if (!matches(value, ty)) return null;
+    if (ciphertext.len < aead.nonce_length + aead.tag_length) return null;
+
+    const key = try deriveKey(allocator, ty);
+    var nonce: [aead.nonce_length]u8 = undefined;
+    std.mem.copy(u8, nonce[0..], ciphertext[0..aead.nonce_length]);
+    const msg_len = ciphertext.len - aead.nonce_length - aead.tag_length;
+    const ct = ciphertext[aead.nonce_length .. aead.nonce_length + msg_len];
+    var tag: [aead.tag_length]u8 = undefined;
+    std.mem.copy(u8, tag[0..], ciphertext[aead.nonce_length + msg_len ..]);
+
+    var out = try allocator.alloc(u8, msg_len);
+    aead.decrypt(out, ct, tag, &[_]u8{}, nonce, key) catch {
+        allocator.free(out);
+        return null;
+    };
     return out;
 }
 
@@ -143,7 +200,7 @@ test "canonicalBytes_pair" {
     const pair_ty = Type{ .Pair = .{ .a = &int_ty, .b = &bool_ty } };
     const bytes = try canonicalBytes(gpa, pair_ty);
     defer gpa.free(bytes);
-    try std.testing.expectEqualSlices(u8, &[_]u8{3, 0, 2}, bytes);
+    try std.testing.expectEqualSlices(u8, &[_]u8{ 3, 0, 2 }, bytes);
 }
 
 test "deriveKey deterministic" {
@@ -158,4 +215,40 @@ test "deriveKey_distinct" {
     const k1 = try deriveKey(gpa, Type{ .Int = {} });
     const k2 = try deriveKey(gpa, Type{ .Bool = {} });
     try std.testing.expect(!std.mem.eql(u8, &k1, &k2));
+}
+
+test "encrypt_decrypt_roundtrip_int" {
+    var gpa = std.testing.allocator;
+    const ty = Type{ .Int = {} };
+    const value = Value{ .Int = 7 };
+    const ct = try encrypt(gpa, ty, "hello");
+    defer gpa.free(ct);
+    const pt_opt = try decrypt(gpa, ty, value, ct);
+    defer if (pt_opt) |pt| gpa.free(pt);
+    try std.testing.expect(pt_opt != null);
+    try std.testing.expectEqualSlices(u8, "hello", pt_opt.?);
+}
+
+test "encrypt_decrypt_roundtrip_str" {
+    var gpa = std.testing.allocator;
+    const ty = Type{ .Str = {} };
+    const value = Value{ .Str = "hi" };
+    const ct = try encrypt(gpa, ty, "data");
+    defer gpa.free(ct);
+    const pt_opt = try decrypt(gpa, ty, value, ct);
+    defer if (pt_opt) |pt| gpa.free(pt);
+    try std.testing.expect(pt_opt != null);
+    try std.testing.expectEqualSlices(u8, "data", pt_opt.?);
+}
+
+test "encrypt_decrypt_roundtrip_bool" {
+    var gpa = std.testing.allocator;
+    const ty = Type{ .Bool = {} };
+    const value = Value{ .Bool = true };
+    const ct = try encrypt(gpa, ty, "abc");
+    defer gpa.free(ct);
+    const pt_opt = try decrypt(gpa, ty, value, ct);
+    defer if (pt_opt) |pt| gpa.free(pt);
+    try std.testing.expect(pt_opt != null);
+    try std.testing.expectEqualSlices(u8, "abc", pt_opt.?);
 }
