@@ -35,7 +35,7 @@ use ring::aead;
 use ring::hkdf;
 use ring::rand::{SecureRandom, SystemRandom};
 
-fn canonical_bytes(ty: &Type, out: &mut Vec<u8>) {
+pub fn canonical_bytes(ty: &Type, out: &mut Vec<u8>) {
     match ty {
         Type::Int => out.push(0),
         Type::Str => out.push(1),
@@ -52,7 +52,7 @@ fn canonical_bytes(ty: &Type, out: &mut Vec<u8>) {
     }
 }
 
-fn derive_key_bytes(ty: &Type) -> [u8; 32] {
+pub fn derive_key_bytes(ty: &Type) -> [u8; 32] {
     let mut bytes = Vec::new();
     canonical_bytes(ty, &mut bytes);
     let salt = hkdf::Salt::new(hkdf::HKDF_SHA256, b"TypeCryptHKDFSalt");
@@ -65,44 +65,45 @@ fn derive_key_bytes(ty: &Type) -> [u8; 32] {
     out
 }
 
-fn key_from_type(ty: &Type) -> aead::LessSafeKey {
+fn key_from_type(ty: &Type) -> Result<aead::LessSafeKey, ring::error::Unspecified> {
     let bytes = derive_key_bytes(ty);
-    let unbound = aead::UnboundKey::new(&aead::CHACHA20_POLY1305, &bytes).expect("invalid key");
-    aead::LessSafeKey::new(unbound)
+    let unbound = aead::UnboundKey::new(&aead::CHACHA20_POLY1305, &bytes)?;
+    Ok(aead::LessSafeKey::new(unbound))
 }
 
 /// Encrypt the given plaintext using the provided `Type` as the key.
-pub fn encrypt(ty: &Type, plaintext: &[u8]) -> Vec<u8> {
-    let key = key_from_type(ty);
+pub fn encrypt(ty: &Type, plaintext: &[u8]) -> Result<Vec<u8>, ring::error::Unspecified> {
+    let key = key_from_type(ty)?;
     let rng = SystemRandom::new();
     let mut nonce_bytes = [0u8; 12];
-    rng.fill(&mut nonce_bytes).expect("random failure");
+    rng.fill(&mut nonce_bytes)?;
     let nonce = aead::Nonce::assume_unique_for_key(nonce_bytes);
     let mut in_out = plaintext.to_vec();
-    key.seal_in_place_append_tag(nonce, aead::Aad::empty(), &mut in_out)
-        .expect("encryption failure");
+    key.seal_in_place_append_tag(nonce, aead::Aad::empty(), &mut in_out)?;
     let mut out = nonce_bytes.to_vec();
     out.extend_from_slice(&in_out);
-    out
+    Ok(out)
 }
 
 /// Decrypt the ciphertext if the value matches the expected type.
-pub fn decrypt_with_value(ty: &Type, value: &Value, ciphertext: &[u8]) -> Option<Vec<u8>> {
+pub fn decrypt_with_value(
+    ty: &Type,
+    value: &Value,
+    ciphertext: &[u8],
+) -> Result<Vec<u8>, ring::error::Unspecified> {
     if !matches(value, ty) {
-        return None;
+        return Err(ring::error::Unspecified);
     }
     if ciphertext.len() < 12 + aead::CHACHA20_POLY1305.tag_len() {
-        return None;
+        return Err(ring::error::Unspecified);
     }
-    let key = key_from_type(ty);
+    let key = key_from_type(ty)?;
     let mut nonce_bytes = [0u8; 12];
     nonce_bytes.copy_from_slice(&ciphertext[..12]);
     let nonce = aead::Nonce::assume_unique_for_key(nonce_bytes);
     let mut in_out = ciphertext[12..].to_vec();
-    let result = key
-        .open_in_place(nonce, aead::Aad::empty(), &mut in_out)
-        .ok()?;
-    Some(result.to_vec())
+    let result = key.open_in_place(nonce, aead::Aad::empty(), &mut in_out)?;
+    Ok(result.to_vec())
 }
 
 #[cfg(test)]
@@ -110,20 +111,22 @@ mod tests {
     use super::*;
 
     #[test]
-    fn encrypt_decrypt_roundtrip() {
+    fn encrypt_decrypt_roundtrip() -> Result<(), ring::error::Unspecified> {
         let ty = Type::Int;
         let value = Value::Int(42);
-        let ct = encrypt(&ty, b"hello");
-        let pt = decrypt_with_value(&ty, &value, &ct).expect("decrypt");
+        let ct = encrypt(&ty, b"hello")?;
+        let pt = decrypt_with_value(&ty, &value, &ct)?;
         assert_eq!(pt, b"hello");
+        Ok(())
     }
 
     #[test]
-    fn decrypt_rejects_wrong_value() {
+    fn decrypt_rejects_wrong_value() -> Result<(), ring::error::Unspecified> {
         let ty = Type::Int;
         let wrong = Value::Str("oops".into());
-        let ct = encrypt(&ty, b"secret");
-        assert!(decrypt_with_value(&ty, &wrong, &ct).is_none());
+        let ct = encrypt(&ty, b"secret")?;
+        assert!(decrypt_with_value(&ty, &wrong, &ct).is_err());
+        Ok(())
     }
 
     #[test]
@@ -159,14 +162,15 @@ mod tests {
     }
 
     #[test]
-    fn multiple_encryptions_use_different_nonces() {
+    fn multiple_encryptions_use_different_nonces() -> Result<(), ring::error::Unspecified> {
         let ty = Type::Int;
         let value = Value::Int(7);
-        let ct1 = encrypt(&ty, b"hello");
-        let ct2 = encrypt(&ty, b"hello");
+        let ct1 = encrypt(&ty, b"hello")?;
+        let ct2 = encrypt(&ty, b"hello")?;
         assert_ne!(ct1, ct2);
-        assert_eq!(decrypt_with_value(&ty, &value, &ct1).unwrap(), b"hello");
-        assert_eq!(decrypt_with_value(&ty, &value, &ct2).unwrap(), b"hello");
+        assert_eq!(decrypt_with_value(&ty, &value, &ct1)?, b"hello");
+        assert_eq!(decrypt_with_value(&ty, &value, &ct2)?, b"hello");
+        Ok(())
     }
 
     #[test]
@@ -185,11 +189,12 @@ mod tests {
     }
 
     #[test]
-    fn decrypt_fails_on_truncated_ciphertext() {
+    fn decrypt_fails_on_truncated_ciphertext() -> Result<(), ring::error::Unspecified> {
         let ty = Type::Int;
         let value = Value::Int(5);
-        let mut ct = encrypt(&ty, b"data");
+        let mut ct = encrypt(&ty, b"data")?;
         ct.pop();
-        assert!(decrypt_with_value(&ty, &value, &ct).is_none());
+        assert!(decrypt_with_value(&ty, &value, &ct).is_err());
+        Ok(())
     }
 }

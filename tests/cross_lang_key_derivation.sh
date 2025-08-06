@@ -29,9 +29,16 @@ fi
 PLAINTEXT="cross-test"
 HS_CT=$(cd haskell && cabal exec runghc -- -isrc ../tests/crypt_hs.hs encrypt)
 RS_CT=$(cargo run --quiet --manifest-path rust/Cargo.toml --bin crypt_tool encrypt)
+ZIG_CT=$(zig run tests/crypt_zig.zig -- encrypt)
 HS_DEC_RS=$(cargo run --quiet --manifest-path rust/Cargo.toml --bin crypt_tool decrypt "$HS_CT")
 RS_DEC_HS=$(cd haskell && cabal exec runghc -- -isrc ../tests/crypt_hs.hs decrypt "$RS_CT")
-if [ "$HS_DEC_RS" != "$PLAINTEXT" ] || [ "$RS_DEC_HS" != "$PLAINTEXT" ]; then
+HS_DEC_ZG=$(cd haskell && cabal exec runghc -- -isrc ../tests/crypt_hs.hs decrypt "$ZIG_CT")
+RS_DEC_ZG=$(cargo run --quiet --manifest-path rust/Cargo.toml --bin crypt_tool decrypt "$ZIG_CT")
+ZIG_DEC_HS=$(zig run tests/crypt_zig.zig -- decrypt "$HS_CT")
+ZIG_DEC_RS=$(zig run tests/crypt_zig.zig -- decrypt "$RS_CT")
+if [ "$HS_DEC_RS" != "$PLAINTEXT" ] || [ "$RS_DEC_HS" != "$PLAINTEXT" ] || \
+   [ "$HS_DEC_ZG" != "$PLAINTEXT" ] || [ "$RS_DEC_ZG" != "$PLAINTEXT" ] || \
+   [ "$ZIG_DEC_HS" != "$PLAINTEXT" ] || [ "$ZIG_DEC_RS" != "$PLAINTEXT" ]; then
   echo "Cross-language encryption mismatch" >&2
   exit 1
 fi

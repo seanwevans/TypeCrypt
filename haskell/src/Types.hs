@@ -75,18 +75,19 @@ keyFromType ty =
       prk = extract salt ikm
    in expand prk info 32
 
-encrypt :: Type a -> ByteString -> IO ByteString
+encrypt :: Type a -> ByteString -> IO (Maybe ByteString)
 encrypt ty plaintext = do
   nonceBytes <- getRandomBytes 12
   let key = keyFromType ty
-      nonce = case C.nonce12 nonceBytes of
-        CryptoFailed _ -> error "invalid nonce"
-        CryptoPassed n -> n
-      st1 = throwCryptoError $ C.initialize key nonce
-      st2 = C.finalizeAAD st1
-      (out, st3) = C.encrypt plaintext st2
-      tag = C.finalize st3
-  pure $ nonceBytes `B.append` out `B.append` convert tag
+  pure $ case C.nonce12 nonceBytes of
+    CryptoFailed _ -> Nothing
+    CryptoPassed nonce -> case C.initialize key nonce of
+      CryptoFailed _ -> Nothing
+      CryptoPassed st1 ->
+        let st2 = C.finalizeAAD st1
+            (out, st3) = C.encrypt plaintext st2
+            tag = C.finalize st3
+         in Just $ nonceBytes `B.append` out `B.append` convert tag
 
 -- | Decrypt if the value matches the expected type and authentication tag checks.
 decrypt :: Type a -> Value -> ByteString -> Maybe ByteString
@@ -97,13 +98,15 @@ decrypt ty val input
       let (nonceBytes, rest) = B.splitAt 12 input
           (ct, tagBytes) = B.splitAt (B.length rest - 16) rest
           key = keyFromType ty
-          nonce = case C.nonce12 nonceBytes of
-            CryptoFailed _ -> error "invalid nonce"
-            CryptoPassed n -> n
-          st1 = throwCryptoError $ C.initialize key nonce
-          st2 = C.finalizeAAD st1
-          (pt, st3) = C.decrypt ct st2
-          tag = C.finalize st3
-       in case authTag tagBytes of
+       in case C.nonce12 nonceBytes of
             CryptoFailed _ -> Nothing
-            CryptoPassed t -> if constEq t tag then Just pt else Nothing
+            CryptoPassed nonce -> case C.initialize key nonce of
+              CryptoFailed _ -> Nothing
+              CryptoPassed st1 ->
+                let st2 = C.finalizeAAD st1
+                    (pt, st3) = C.decrypt ct st2
+                    tag = C.finalize st3
+                 in case authTag tagBytes of
+                      CryptoFailed _ -> Nothing
+                      CryptoPassed t ->
+                        if constEq t tag then Just pt else Nothing
