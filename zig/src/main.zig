@@ -66,7 +66,7 @@ pub fn encrypt(
     plaintext: []const u8,
 ) ![]u8 {
     const aead = std.crypto.aead.chacha_poly.ChaCha20Poly1305;
-    const key = try deriveKey(allocator, ty);
+    var key = try deriveKey(allocator, ty);
     var nonce: [aead.nonce_length]u8 = undefined;
     std.crypto.random.bytes(nonce[0..]);
 
@@ -84,6 +84,7 @@ pub fn encrypt(
         key,
     );
     std.mem.copy(u8, out[aead.nonce_length + plaintext.len ..], tag[0..]);
+    std.crypto.utils.secureZero(u8, key[0..]);
     return out;
 }
 
@@ -99,7 +100,7 @@ pub fn decrypt(
     if (!matches(value, ty)) return null;
     if (ciphertext.len < aead.nonce_length + aead.tag_length) return null;
 
-    const key = try deriveKey(allocator, ty);
+    var key = try deriveKey(allocator, ty);
     var nonce: [aead.nonce_length]u8 = undefined;
     std.mem.copy(u8, nonce[0..], ciphertext[0..aead.nonce_length]);
     const msg_len = ciphertext.len - aead.nonce_length - aead.tag_length;
@@ -109,9 +110,11 @@ pub fn decrypt(
 
     var out = try allocator.alloc(u8, msg_len);
     aead.decrypt(out, ct, tag, &[_]u8{}, nonce, key) catch {
+        std.crypto.utils.secureZero(u8, key[0..]);
         allocator.free(out);
         return null;
     };
+    std.crypto.utils.secureZero(u8, key[0..]);
     return out;
 }
 
