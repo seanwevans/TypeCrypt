@@ -26,30 +26,30 @@ main = hspec $ do
     it "roundtrips for Int" $ property $ \(n :: Int) bs ->
       ioProperty $ do
         ctM <- encrypt TInt bs
-        pure $ (ctM >>= decrypt TInt (V TInt n)) == Just bs
+        pure $ maybe False (\ct -> decrypt TInt (V TInt n) ct == Right bs) ctM
     it "roundtrips for String" $ property $ \(s :: String) bs ->
       ioProperty $ do
         ctM <- encrypt TString bs
-        pure $ (ctM >>= decrypt TString (V TString s)) == Just bs
+        pure $ maybe False (\ct -> decrypt TString (V TString s) ct == Right bs) ctM
     it "roundtrips for (Int, String)" $ property $ \(a :: Int) (b :: String) bs ->
       ioProperty $ do
         let ty = TPair TInt TString
             val = V ty (a, b)
         ctM <- encrypt ty bs
-        pure $ (ctM >>= decrypt ty val) == Just bs
+        pure $ maybe False (\ct -> decrypt ty val ct == Right bs) ctM
     it "roundtrips for [Int]" $ property $ \(xs :: [Int]) bs ->
       ioProperty $ do
         let ty = TList TInt
             val = V ty xs
         ctM <- encrypt ty bs
-        pure $ (ctM >>= decrypt ty val) == Just bs
+        pure $ maybe False (\ct -> decrypt ty val ct == Right bs) ctM
     it "roundtrips for nested (Int, [String])" $
       property $ \(n :: Int) (xs :: [String]) bs ->
         ioProperty $ do
           let ty = TPair TInt (TList TString)
               val = V ty (n, xs)
           ctM <- encrypt ty bs
-          pure $ (ctM >>= decrypt ty val) == Just bs
+          pure $ maybe False (\ct -> decrypt ty val ct == Right bs) ctM
     it "matches Bool" $ property $ \b ->
       matches (V TBool b) TBool
     it "matches Pair" $ property $ \a b ->
@@ -59,17 +59,17 @@ main = hspec $ do
     it "roundtrips for Bool" $ property $ \(b :: Bool) bs ->
       ioProperty $ do
         ctM <- encrypt TBool bs
-        pure $ (ctM >>= decrypt TBool (V TBool b)) == Just bs
+        pure $ maybe False (\ct -> decrypt TBool (V TBool b) ct == Right bs) ctM
     it "roundtrips for Pair" $ property $ \(a :: Int) (b :: String) bs ->
       ioProperty $ do
         let t = TPair TInt TString
         ctM <- encrypt t bs
-        pure $ (ctM >>= decrypt t (V t (a, b))) == Just bs
+        pure $ maybe False (\ct -> decrypt t (V t (a, b)) ct == Right bs) ctM
     it "roundtrips for List" $ property $ \(xs :: [Int]) bs ->
       ioProperty $ do
         let t = TList TInt
         ctM <- encrypt t bs
-        pure $ (ctM >>= decrypt t (V t xs)) == Just bs
+        pure $ maybe False (\ct -> decrypt t (V t xs) ct == Right bs) ctM
     it "multiple encryptions use different nonces" $
       property $ \(bs :: ByteString) -> ioProperty $ do
         let ty = TInt
@@ -82,11 +82,11 @@ main = hspec $ do
       property $ \(bs :: ByteString) (s :: String) -> ioProperty $ do
         let ty = TInt
         ctM <- encrypt ty bs
-        pure $ maybe False (\ct -> decrypt ty (V TString s) ct == Nothing) ctM
+        pure $ maybe False (\ct -> decrypt ty (V TString s) ct == Left TypeMismatch) ctM
     it "fails to decrypt with wrong Type" $
       property $ \(n :: Int) bs -> ioProperty $ do
         ctM <- encrypt TInt bs
-        pure $ maybe False (\ct -> decrypt TString (V TInt n) ct == Nothing) ctM
+        pure $ maybe False (\ct -> decrypt TString (V TInt n) ct == Left TypeMismatch) ctM
 
     it "fails to decrypt when ciphertext is truncated" $
       property $ \(n :: Int) (bs :: ByteString) -> ioProperty $ do
@@ -96,7 +96,10 @@ main = hspec $ do
             False
             ( \ct ->
                 let truncated = B.take (B.length ct - 1) ct
-                 in decrypt TInt (V TInt n) truncated == Nothing
+                 in case decrypt TInt (V TInt n) truncated of
+                      Left TruncatedCiphertext -> True
+                      Left CryptoError -> True
+                      _ -> False
             )
             ctM
 
@@ -109,7 +112,7 @@ main = hspec $ do
             ( \ct ->
                 let first = B.index ct 0
                     tampered = B.cons (first `xor` 1) (B.drop 1 ct)
-                 in decrypt TInt (V TInt n) tampered == Nothing
+                 in decrypt TInt (V TInt n) tampered == Left CryptoError
             )
             ctM
 

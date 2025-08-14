@@ -40,6 +40,14 @@ instance Show Value where
   show (V (TPair _ _) _) = "VPair"
   show (V (TList _) _) = "VList"
 
+-- | Errors that can occur during decryption.
+data DecryptError
+  = TypeMismatch
+  | TruncatedCiphertext
+  | NonceError
+  | CryptoError
+  deriving (Eq, Show)
+
 -- | Check if a 'Value' matches a 'Type'.
 -- Returns 'True' when the internal type witness equals the given type.
 matches :: Value -> Type a -> Bool
@@ -90,23 +98,23 @@ encrypt ty plaintext = do
          in Just $ nonceBytes `B.append` out `B.append` convert tag
 
 -- | Decrypt if the value matches the expected type and authentication tag checks.
-decrypt :: Type a -> Value -> ByteString -> Maybe ByteString
+decrypt :: Type a -> Value -> ByteString -> Either DecryptError ByteString
 decrypt ty val input
-  | not (matches val ty) = Nothing
-  | B.length input < 28 = Nothing
+  | not (matches val ty) = Left TypeMismatch
+  | B.length input < 28 = Left TruncatedCiphertext
   | otherwise =
       let (nonceBytes, rest) = B.splitAt 12 input
           (ct, tagBytes) = B.splitAt (B.length rest - 16) rest
           key = keyFromType ty
        in case C.nonce12 nonceBytes of
-            CryptoFailed _ -> Nothing
+            CryptoFailed _ -> Left NonceError
             CryptoPassed nonce -> case C.initialize key nonce of
-              CryptoFailed _ -> Nothing
+              CryptoFailed _ -> Left CryptoError
               CryptoPassed st1 ->
                 let st2 = C.finalizeAAD st1
                     (pt, st3) = C.decrypt ct st2
                     tag = C.finalize st3
                  in case authTag tagBytes of
-                      CryptoFailed _ -> Nothing
+                      CryptoFailed _ -> Left CryptoError
                       CryptoPassed t ->
-                        if constEq t tag then Just pt else Nothing
+                        if constEq t tag then Right pt else Left CryptoError
