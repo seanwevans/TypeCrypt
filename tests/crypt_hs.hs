@@ -29,6 +29,6 @@ main = do
     ["decrypt", hexCt] -> do
       let ct = unhex hexCt
       case decrypt TInt (V TInt (0 :: Int)) ct of
-        Just pt -> C.putStrLn pt
-        Nothing -> putStrLn "FAIL"
+        Right pt -> C.putStrLn pt
+        Left _ -> putStrLn "FAIL"
     _ -> putStrLn "usage: encrypt|decrypt [hex]"
