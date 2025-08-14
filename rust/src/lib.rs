@@ -2,7 +2,7 @@
 //!
 //! This crate will implement the hardened TypeCrypt engine.
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Type {
     Int,
     Str,
@@ -11,7 +11,7 @@ pub enum Type {
     List(Box<Type>),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Value {
     Int(i32),
     Str(String),
