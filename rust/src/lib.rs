@@ -85,24 +85,33 @@ pub fn encrypt(ty: &Type, plaintext: &[u8]) -> Result<Vec<u8>, ring::error::Unsp
     Ok(out)
 }
 
+#[derive(Debug)]
+pub enum DecryptError {
+    TypeMismatch,
+    TruncatedCiphertext,
+    Crypto(ring::error::Unspecified),
+}
+
 /// Decrypt the ciphertext if the value matches the expected type.
 pub fn decrypt_with_value(
     ty: &Type,
     value: &Value,
     ciphertext: &[u8],
-) -> Result<Vec<u8>, ring::error::Unspecified> {
+) -> Result<Vec<u8>, DecryptError> {
     if !matches(value, ty) {
-        return Err(ring::error::Unspecified);
+        return Err(DecryptError::TypeMismatch);
     }
     if ciphertext.len() < 12 + aead::CHACHA20_POLY1305.tag_len() {
-        return Err(ring::error::Unspecified);
+        return Err(DecryptError::TruncatedCiphertext);
     }
-    let key = key_from_type(ty)?;
+    let key = key_from_type(ty).map_err(DecryptError::Crypto)?;
     let mut nonce_bytes = [0u8; 12];
     nonce_bytes.copy_from_slice(&ciphertext[..12]);
     let nonce = aead::Nonce::assume_unique_for_key(nonce_bytes);
     let mut in_out = ciphertext[12..].to_vec();
-    let result = key.open_in_place(nonce, aead::Aad::empty(), &mut in_out)?;
+    let result = key
+        .open_in_place(nonce, aead::Aad::empty(), &mut in_out)
+        .map_err(DecryptError::Crypto)?;
     Ok(result.to_vec())
 }
 
@@ -111,21 +120,24 @@ mod tests {
     use super::*;
 
     #[test]
-    fn encrypt_decrypt_roundtrip() -> Result<(), ring::error::Unspecified> {
+    fn encrypt_decrypt_roundtrip() -> Result<(), DecryptError> {
         let ty = Type::Int;
         let value = Value::Int(42);
-        let ct = encrypt(&ty, b"hello")?;
+        let ct = encrypt(&ty, b"hello").map_err(DecryptError::Crypto)?;
         let pt = decrypt_with_value(&ty, &value, &ct)?;
         assert_eq!(pt, b"hello");
         Ok(())
     }
 
     #[test]
-    fn decrypt_rejects_wrong_value() -> Result<(), ring::error::Unspecified> {
+    fn decrypt_rejects_wrong_value() -> Result<(), DecryptError> {
         let ty = Type::Int;
         let wrong = Value::Str("oops".into());
-        let ct = encrypt(&ty, b"secret")?;
-        assert!(decrypt_with_value(&ty, &wrong, &ct).is_err());
+        let ct = encrypt(&ty, b"secret").map_err(DecryptError::Crypto)?;
+        assert!(matches!(
+            decrypt_with_value(&ty, &wrong, &ct),
+            Err(DecryptError::TypeMismatch)
+        ));
         Ok(())
     }
 
@@ -162,11 +174,11 @@ mod tests {
     }
 
     #[test]
-    fn multiple_encryptions_use_different_nonces() -> Result<(), ring::error::Unspecified> {
+    fn multiple_encryptions_use_different_nonces() -> Result<(), DecryptError> {
         let ty = Type::Int;
         let value = Value::Int(7);
-        let ct1 = encrypt(&ty, b"hello")?;
-        let ct2 = encrypt(&ty, b"hello")?;
+        let ct1 = encrypt(&ty, b"hello").map_err(DecryptError::Crypto)?;
+        let ct2 = encrypt(&ty, b"hello").map_err(DecryptError::Crypto)?;
         assert_ne!(ct1, ct2);
         assert_eq!(decrypt_with_value(&ty, &value, &ct1)?, b"hello");
         assert_eq!(decrypt_with_value(&ty, &value, &ct2)?, b"hello");
@@ -189,12 +201,15 @@ mod tests {
     }
 
     #[test]
-    fn decrypt_fails_on_truncated_ciphertext() -> Result<(), ring::error::Unspecified> {
+    fn decrypt_fails_on_truncated_ciphertext() -> Result<(), DecryptError> {
         let ty = Type::Int;
         let value = Value::Int(5);
-        let mut ct = encrypt(&ty, b"data")?;
-        ct.pop();
-        assert!(decrypt_with_value(&ty, &value, &ct).is_err());
+        let mut ct = encrypt(&ty, b"data").map_err(DecryptError::Crypto)?;
+        ct.truncate(10);
+        assert!(matches!(
+            decrypt_with_value(&ty, &value, &ct),
+            Err(DecryptError::TruncatedCiphertext)
+        ));
         Ok(())
     }
 }
