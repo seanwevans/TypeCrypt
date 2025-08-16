@@ -18,8 +18,8 @@ pub const Value = union(Tag) {
     Int: i32,
     Str: []const u8,
     Bool: bool,
-    Pair: struct { a: Value, b: Value },
-    List: []Value,
+    Pair: struct { a: *const Value, b: *const Value },
+    List: []const Value,
 };
 
 /// Produce the canonical byte encoding of a `Type`.
@@ -52,9 +52,9 @@ pub fn deriveKey(allocator: std.mem.Allocator, ty: Type) ![32]u8 {
     defer allocator.free(bytes);
     const salt = "TypeCryptHKDFSalt";
     const info = "TypeCryptHKDFInfo";
-    const prk = std.crypto.hkdf.HkdfSha256.extract(salt, bytes);
+    const prk = std.crypto.kdf.hkdf.HkdfSha256.extract(salt, bytes);
     var out: [32]u8 = undefined;
-    std.crypto.hkdf.HkdfSha256.expand(out[0..], info, prk);
+    std.crypto.kdf.hkdf.HkdfSha256.expand(out[0..], info, prk);
     return out;
 }
 
@@ -72,7 +72,7 @@ pub fn encrypt(
 
     const total_len = aead.nonce_length + plaintext.len + aead.tag_length;
     var out = try allocator.alloc(u8, total_len);
-    std.mem.copy(u8, out[0..aead.nonce_length], nonce[0..]);
+    std.mem.copyForwards(u8, out[0..aead.nonce_length], nonce[0..]);
 
     var tag: [aead.tag_length]u8 = undefined;
     aead.encrypt(
@@ -83,7 +83,7 @@ pub fn encrypt(
         nonce,
         key,
     );
-    std.mem.copy(u8, out[aead.nonce_length + plaintext.len ..], tag[0..]);
+    std.mem.copyForwards(u8, out[aead.nonce_length + plaintext.len ..], tag[0..]);
     std.crypto.utils.secureZero(u8, key[0..]);
     return out;
 }
@@ -102,13 +102,13 @@ pub fn decrypt(
 
     var key = try deriveKey(allocator, ty);
     var nonce: [aead.nonce_length]u8 = undefined;
-    std.mem.copy(u8, nonce[0..], ciphertext[0..aead.nonce_length]);
+    std.mem.copyForwards(u8, nonce[0..], ciphertext[0..aead.nonce_length]);
     const msg_len = ciphertext.len - aead.nonce_length - aead.tag_length;
     const ct = ciphertext[aead.nonce_length .. aead.nonce_length + msg_len];
     var tag: [aead.tag_length]u8 = undefined;
-    std.mem.copy(u8, tag[0..], ciphertext[aead.nonce_length + msg_len ..]);
+    std.mem.copyForwards(u8, tag[0..], ciphertext[aead.nonce_length + msg_len ..]);
 
-    var out = try allocator.alloc(u8, msg_len);
+    const out = try allocator.alloc(u8, msg_len);
     aead.decrypt(out, ct, tag, &[_]u8{}, nonce, key) catch {
         std.crypto.utils.secureZero(u8, key[0..]);
         allocator.free(out);
@@ -124,7 +124,7 @@ pub fn typeHash(comptime T: type) u64 {
     var hash: u64 = 0xcbf29ce484222325;
     const name = @typeName(T);
     for (name) |c| {
-        hash = (hash ^ @as(u64, c)) * 0x100000001b3;
+        hash = (hash ^ @as(u64, c)) *% 0x100000001b3;
     }
     return hash;
 }
@@ -138,7 +138,7 @@ pub fn matches(v: Value, expected: Type) bool {
         .Pair => |pt| {
             if (std.meta.activeTag(v) != .Pair) return false;
             const val = v.Pair;
-            return matches(val.a, pt.a.*) and matches(val.b, pt.b.*);
+            return matches(val.a.*, pt.a.*) and matches(val.b.*, pt.b.*);
         },
         .List => |elem_ty| {
             if (std.meta.activeTag(v) != .List) return false;
@@ -178,7 +178,9 @@ test "matches_pair" {
     const int_ty = Type{ .Int = {} };
     const str_ty = Type{ .Str = {} };
     const pair_ty = Type{ .Pair = .{ .a = &int_ty, .b = &str_ty } };
-    const v = Value{ .Pair = .{ .a = Value{ .Int = 1 }, .b = Value{ .Str = "a" } } };
+    const v1 = Value{ .Int = 1 };
+    const v2 = Value{ .Str = "a" };
+    const v = Value{ .Pair = .{ .a = &v1, .b = &v2 } };
     try std.testing.expect(matches(v, pair_ty));
 }
 
@@ -191,14 +193,14 @@ test "matches_list" {
 }
 
 test "canonicalBytes_int" {
-    var gpa = std.testing.allocator;
+    const gpa = std.testing.allocator;
     const bytes = try canonicalBytes(gpa, Type{ .Int = {} });
     defer gpa.free(bytes);
     try std.testing.expectEqualSlices(u8, &[_]u8{0}, bytes);
 }
 
 test "canonicalBytes_pair" {
-    var gpa = std.testing.allocator;
+    const gpa = std.testing.allocator;
     const int_ty = Type{ .Int = {} };
     const bool_ty = Type{ .Bool = {} };
     const pair_ty = Type{ .Pair = .{ .a = &int_ty, .b = &bool_ty } };
@@ -208,21 +210,21 @@ test "canonicalBytes_pair" {
 }
 
 test "deriveKey deterministic" {
-    var gpa = std.testing.allocator;
+    const gpa = std.testing.allocator;
     const k1 = try deriveKey(gpa, Type{ .Str = {} });
     const k2 = try deriveKey(gpa, Type{ .Str = {} });
     try std.testing.expectEqualSlices(u8, &k1, &k2);
 }
 
 test "deriveKey_distinct" {
-    var gpa = std.testing.allocator;
+    const gpa = std.testing.allocator;
     const k1 = try deriveKey(gpa, Type{ .Int = {} });
     const k2 = try deriveKey(gpa, Type{ .Bool = {} });
     try std.testing.expect(!std.mem.eql(u8, &k1, &k2));
 }
 
 test "encrypt_decrypt_roundtrip_int" {
-    var gpa = std.testing.allocator;
+    const gpa = std.testing.allocator;
     const ty = Type{ .Int = {} };
     const value = Value{ .Int = 7 };
     const ct = try encrypt(gpa, ty, "hello");
@@ -234,7 +236,7 @@ test "encrypt_decrypt_roundtrip_int" {
 }
 
 test "encrypt_decrypt_roundtrip_str" {
-    var gpa = std.testing.allocator;
+    const gpa = std.testing.allocator;
     const ty = Type{ .Str = {} };
     const value = Value{ .Str = "hi" };
     const ct = try encrypt(gpa, ty, "data");
@@ -246,7 +248,7 @@ test "encrypt_decrypt_roundtrip_str" {
 }
 
 test "encrypt_decrypt_roundtrip_bool" {
-    var gpa = std.testing.allocator;
+    const gpa = std.testing.allocator;
     const ty = Type{ .Bool = {} };
     const value = Value{ .Bool = true };
     const ct = try encrypt(gpa, ty, "abc");
