@@ -52,7 +52,7 @@ jobs:
           echo "{\"agent\": \"ci\", \"task\": \"run_all_tests\", \"status\": \"$status\", \"timestamp\": \"$timestamp\"}" > test-results.jsonl
       - name: Upload log artifact
         if: always()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: ci-logs
           path: test-results.jsonl
