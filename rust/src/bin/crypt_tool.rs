@@ -1,14 +1,32 @@
-use std::env;
+use std::{env, fmt, num::ParseIntError};
 use typecrypt::{decrypt_with_value, encrypt, Type, Value};
 
 fn hex(bytes: &[u8]) -> String {
     bytes.iter().map(|b| format!("{:02x}", b)).collect()
 }
 
-fn unhex(s: &str) -> Vec<u8> {
+#[derive(Debug)]
+enum HexError {
+    InvalidLength,
+    Parse(ParseIntError),
+}
+
+impl fmt::Display for HexError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            HexError::InvalidLength => write!(f, "hex string must have even length"),
+            HexError::Parse(e) => write!(f, "{e}"),
+        }
+    }
+}
+
+fn unhex(s: &str) -> Result<Vec<u8>, HexError> {
+    if s.len() % 2 != 0 {
+        return Err(HexError::InvalidLength);
+    }
     (0..s.len())
         .step_by(2)
-        .map(|i| u8::from_str_radix(&s[i..i + 2], 16).unwrap())
+        .map(|i| u8::from_str_radix(&s[i..i + 2], 16).map_err(HexError::Parse))
         .collect()
 }
 
@@ -30,7 +48,13 @@ fn main() -> Result<(), ring::error::Unspecified> {
                 eprintln!("decrypt requires hex ciphertext");
                 std::process::exit(1);
             }
-            let ct = unhex(&args[2]);
+            let ct = match unhex(&args[2]) {
+                Ok(ct) => ct,
+                Err(e) => {
+                    eprintln!("invalid hex string: {e}");
+                    std::process::exit(1);
+                }
+            };
             let val = Value::Int(0);
             match decrypt_with_value(&Type::Int, &val, &ct) {
                 Ok(pt) => println!("{}", String::from_utf8_lossy(&pt)),
@@ -46,4 +70,15 @@ fn main() -> Result<(), ring::error::Unspecified> {
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn unhex_invalid_string_errors() {
+        assert!(unhex("zz").is_err());
+        assert!(unhex("123").is_err());
+    }
 }
