@@ -38,9 +38,9 @@ fn deriveKey(allocator: std.mem.Allocator, ty: Type) ![32]u8 {
     defer allocator.free(bytes);
     const salt = "TypeCryptHKDFSalt";
     const info = "TypeCryptHKDFInfo";
-    const prk = std.crypto.hkdf.HkdfSha256.extract(salt, bytes);
+    const prk = std.crypto.kdf.hkdf.HkdfSha256.extract(salt, bytes);
     var out: [32]u8 = undefined;
-    std.crypto.hkdf.HkdfSha256.expand(out[0..], info, prk);
+    std.crypto.kdf.hkdf.HkdfSha256.expand(out[0..], info, prk);
     return out;
 }
 

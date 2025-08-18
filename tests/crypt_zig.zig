@@ -1,15 +1,51 @@
 const std = @import("std");
 
-fn deriveKey() [32]u8 {
-    var hasher = std.crypto.hash.sha2.Sha256.init(.{});
-    hasher.update(&[_]u8{0});
+pub const Tag = enum { Int, Str, Bool, Pair, List };
+
+pub const Type = union(Tag) {
+    Int: void,
+    Str: void,
+    Bool: void,
+    Pair: struct { a: *const Type, b: *const Type },
+    List: *const Type,
+};
+
+fn canonicalBytesImpl(ty: Type, list: *std.ArrayList(u8)) !void {
+    switch (ty) {
+        .Int => try list.append(0),
+        .Str => try list.append(1),
+        .Bool => try list.append(2),
+        .Pair => |p| {
+            try list.append(3);
+            try canonicalBytesImpl(p.a.*, list);
+            try canonicalBytesImpl(p.b.*, list);
+        },
+        .List => |elem| {
+            try list.append(4);
+            try canonicalBytesImpl(elem.*, list);
+        },
+    }
+}
+
+fn canonicalBytes(allocator: std.mem.Allocator, ty: Type) ![]u8 {
+    var list = std.ArrayList(u8).init(allocator);
+    try canonicalBytesImpl(ty, &list);
+    return list.toOwnedSlice();
+}
+
+fn deriveKey(allocator: std.mem.Allocator, ty: Type) ![32]u8 {
+    const bytes = try canonicalBytes(allocator, ty);
+    defer allocator.free(bytes);
+    const salt = "TypeCryptHKDFSalt";
+    const info = "TypeCryptHKDFInfo";
+    const prk = std.crypto.kdf.hkdf.HkdfSha256.extract(salt, bytes);
     var out: [32]u8 = undefined;
-    hasher.final(out[0..]);
+    std.crypto.kdf.hkdf.HkdfSha256.expand(out[0..], info, prk);
     return out;
 }
 
 fn encrypt(plaintext: []const u8) ![]u8 {
-    var key = deriveKey();
+    var key = try deriveKey(std.heap.page_allocator, Type{ .Int = {} });
     var nonce: [12]u8 = undefined;
     std.crypto.random.bytes(&nonce);
     const tag_len = std.crypto.aead.chacha_poly.ChaCha20Poly1305.tag_length;
@@ -27,7 +63,7 @@ fn encrypt(plaintext: []const u8) ![]u8 {
 fn decrypt(ciphertext: []const u8) !?[]u8 {
     const tag_len = std.crypto.aead.chacha_poly.ChaCha20Poly1305.tag_length;
     if (ciphertext.len < 12 + tag_len) return null;
-    var key = deriveKey();
+    var key = try deriveKey(std.heap.page_allocator, Type{ .Int = {} });
     var nonce: [12]u8 = undefined;
     std.mem.copy(u8, &nonce, ciphertext[0..12]);
     const ct_len = ciphertext.len - 12 - tag_len;
