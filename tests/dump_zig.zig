@@ -1,4 +1,5 @@
 const std = @import("std");
+const key = @import("../zig/src/key.zig");
 
 pub const Tag = enum { Int, Str, Bool, Pair, List };
 
@@ -44,6 +45,7 @@ fn deriveKey(allocator: std.mem.Allocator, ty: Type) ![32]u8 {
     return out;
 }
 
+
 fn hex(buf: []const u8) ![]u8 {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
@@ -64,9 +66,9 @@ pub fn main() !void {
         .{ .name = "list", .ty = list },
     };
     for (entries) |e| {
-        const bytes = try canonicalBytes(gpa, e.ty);
+        const bytes = try key.canonicalBytes(Type, gpa, e.ty);
         defer gpa.free(bytes);
-        const key = try deriveKey(gpa, e.ty);
+        const key = try key.deriveKey(Type, gpa, e.ty);
         var hex_buf: [64]u8 = undefined;
         const key_hex = std.fmt.bufPrint(&hex_buf, "{s}", .{std.fmt.fmtSliceHexLower(&key)}) catch unreachable;
         const bytes_repr = try std.fmt.allocPrint(gpa, "{any}", .{bytes});

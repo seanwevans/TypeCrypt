@@ -1,4 +1,5 @@
 const std = @import("std");
+const key = @import("key.zig");
 
 /// Runtime representation of a Type.
 /// This mirrors the Rust `Type` enum and allows
@@ -22,41 +23,7 @@ pub const Value = union(Tag) {
     List: []const Value,
 };
 
-/// Produce the canonical byte encoding of a `Type`.
-pub fn canonicalBytes(allocator: std.mem.Allocator, ty: Type) ![]u8 {
-    var list = std.ArrayList(u8).init(allocator);
-    try canonicalBytesImpl(ty, &list);
-    return list.toOwnedSlice();
-}
-
-fn canonicalBytesImpl(ty: Type, list: *std.ArrayList(u8)) !void {
-    switch (ty) {
-        .Int => try list.append(0),
-        .Str => try list.append(1),
-        .Bool => try list.append(2),
-        .Pair => |p| {
-            try list.append(3);
-            try canonicalBytesImpl(p.a.*, list);
-            try canonicalBytesImpl(p.b.*, list);
-        },
-        .List => |elem| {
-            try list.append(4);
-            try canonicalBytesImpl(elem.*, list);
-        },
-    }
-}
-
-/// Derive a 32-byte key using HKDF-SHA256 with fixed salt and info.
-pub fn deriveKey(allocator: std.mem.Allocator, ty: Type) ![32]u8 {
-    const bytes = try canonicalBytes(allocator, ty);
-    defer allocator.free(bytes);
-    const salt = "TypeCryptHKDFSalt";
-    const info = "TypeCryptHKDFInfo";
-    const prk = std.crypto.kdf.hkdf.HkdfSha256.extract(salt, bytes);
-    var out: [32]u8 = undefined;
-    std.crypto.kdf.hkdf.HkdfSha256.expand(out[0..], info, prk);
-    return out;
-}
+// Key derivation helpers live in `key.zig` and are reused by tests.
 
 /// Encrypt `plaintext` using a key derived from `ty`.
 /// Returns a newly allocated slice containing `nonce || ciphertext || tag`.
@@ -66,7 +33,7 @@ pub fn encrypt(
     plaintext: []const u8,
 ) ![]u8 {
     const aead = std.crypto.aead.chacha_poly.ChaCha20Poly1305;
-    var key = try deriveKey(allocator, ty);
+    var key_bytes = try key.deriveKey(Type, allocator, ty);
     var nonce: [aead.nonce_length]u8 = undefined;
     std.crypto.random.bytes(nonce[0..]);
 
@@ -81,10 +48,10 @@ pub fn encrypt(
         plaintext,
         &[_]u8{},
         nonce,
-        key,
+        key_bytes,
     );
     std.mem.copyForwards(u8, out[aead.nonce_length + plaintext.len ..], tag[0..]);
-    std.crypto.utils.secureZero(u8, key[0..]);
+    std.crypto.utils.secureZero(u8, key_bytes[0..]);
     return out;
 }
 
@@ -100,7 +67,7 @@ pub fn decrypt(
     if (!matches(value, ty)) return null;
     if (ciphertext.len < aead.nonce_length + aead.tag_length) return null;
 
-    var key = try deriveKey(allocator, ty);
+    var key_bytes = try key.deriveKey(Type, allocator, ty);
     var nonce: [aead.nonce_length]u8 = undefined;
     std.mem.copyForwards(u8, nonce[0..], ciphertext[0..aead.nonce_length]);
     const msg_len = ciphertext.len - aead.nonce_length - aead.tag_length;
@@ -109,12 +76,12 @@ pub fn decrypt(
     std.mem.copyForwards(u8, tag[0..], ciphertext[aead.nonce_length + msg_len ..]);
 
     const out = try allocator.alloc(u8, msg_len);
-    aead.decrypt(out, ct, tag, &[_]u8{}, nonce, key) catch {
-        std.crypto.utils.secureZero(u8, key[0..]);
+    aead.decrypt(out, ct, tag, &[_]u8{}, nonce, key_bytes) catch {
+        std.crypto.utils.secureZero(u8, key_bytes[0..]);
         allocator.free(out);
         return null;
     };
-    std.crypto.utils.secureZero(u8, key[0..]);
+    std.crypto.utils.secureZero(u8, key_bytes[0..]);
     return out;
 }
 
@@ -194,7 +161,7 @@ test "matches_list" {
 
 test "canonicalBytes_int" {
     const gpa = std.testing.allocator;
-    const bytes = try canonicalBytes(gpa, Type{ .Int = {} });
+    const bytes = try key.canonicalBytes(Type, gpa, Type{ .Int = {} });
     defer gpa.free(bytes);
     try std.testing.expectEqualSlices(u8, &[_]u8{0}, bytes);
 }
@@ -204,22 +171,22 @@ test "canonicalBytes_pair" {
     const int_ty = Type{ .Int = {} };
     const bool_ty = Type{ .Bool = {} };
     const pair_ty = Type{ .Pair = .{ .a = &int_ty, .b = &bool_ty } };
-    const bytes = try canonicalBytes(gpa, pair_ty);
+    const bytes = try key.canonicalBytes(Type, gpa, pair_ty);
     defer gpa.free(bytes);
     try std.testing.expectEqualSlices(u8, &[_]u8{ 3, 0, 2 }, bytes);
 }
 
 test "deriveKey deterministic" {
     const gpa = std.testing.allocator;
-    const k1 = try deriveKey(gpa, Type{ .Str = {} });
-    const k2 = try deriveKey(gpa, Type{ .Str = {} });
+    const k1 = try key.deriveKey(Type, gpa, Type{ .Str = {} });
+    const k2 = try key.deriveKey(Type, gpa, Type{ .Str = {} });
     try std.testing.expectEqualSlices(u8, &k1, &k2);
 }
 
 test "deriveKey_distinct" {
     const gpa = std.testing.allocator;
-    const k1 = try deriveKey(gpa, Type{ .Int = {} });
-    const k2 = try deriveKey(gpa, Type{ .Bool = {} });
+    const k1 = try key.deriveKey(Type, gpa, Type{ .Int = {} });
+    const k2 = try key.deriveKey(Type, gpa, Type{ .Bool = {} });
     try std.testing.expect(!std.mem.eql(u8, &k1, &k2));
 }
 

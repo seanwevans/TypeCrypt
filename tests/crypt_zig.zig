@@ -1,4 +1,5 @@
 const std = @import("std");
+const key = @import("../zig/src/key.zig");
 
 pub const Tag = enum { Int, Str, Bool, Pair, List };
 
@@ -9,6 +10,12 @@ pub const Type = union(Tag) {
     Pair: struct { a: *const Type, b: *const Type },
     List: *const Type,
 };
+
+
+const int_ty = Type{ .Int = {} };
+
+fn encrypt(plaintext: []const u8) ![]u8 {
+    var key_bytes = try key.deriveKey(Type, std.heap.page_allocator, int_ty);
 
 fn canonicalBytesImpl(ty: Type, list: *std.ArrayList(u8)) !void {
     switch (ty) {
@@ -52,17 +59,21 @@ fn encrypt(
 ) ![]u8 {
     const key = try deriveKey(allocator, ty);
 
+
     var nonce: [12]u8 = undefined;
     std.crypto.random.bytes(&nonce);
     const tag_len = std.crypto.aead.chacha_poly.ChaCha20Poly1305.tag_length;
     var ct = try allocator.alloc(u8, plaintext.len);
     defer allocator.free(ct);
     var tag: [tag_len]u8 = undefined;
-    std.crypto.aead.chacha_poly.ChaCha20Poly1305.encrypt(ct, &tag, plaintext, &[_]u8{}, nonce, key);
-    var out = try allocator.alloc(u8, nonce.len + ct.len + tag_len);
+
+    std.crypto.aead.chacha_poly.ChaCha20Poly1305.encrypt(ct, &tag, plaintext, &[_]u8{}, nonce, key_bytes);
+    var out = try std.heap.page_allocator.alloc(u8, nonce.len + ct.len + tag_len);
+
     std.mem.copy(u8, out[0..nonce.len], &nonce);
     std.mem.copy(u8, out[nonce.len .. nonce.len + ct.len], ct);
     std.mem.copy(u8, out[nonce.len + ct.len ..], &tag);
+    std.crypto.utils.secureZero(u8, key_bytes[0..]);
     return out;
 }
 
@@ -73,7 +84,8 @@ fn decrypt(
 ) !?[]u8 {
     const tag_len = std.crypto.aead.chacha_poly.ChaCha20Poly1305.tag_length;
     if (ciphertext.len < 12 + tag_len) return null;
-    const key = try deriveKey(allocator, ty);
+
+    var key_bytes = try key.deriveKey(Type, std.heap.page_allocator, int_ty);
 
     var nonce: [12]u8 = undefined;
     std.mem.copy(u8, &nonce, ciphertext[0..12]);
@@ -81,11 +93,14 @@ fn decrypt(
     const ct = ciphertext[12 .. 12 + ct_len];
     var tag: [tag_len]u8 = undefined;
     std.mem.copy(u8, &tag, ciphertext[12 + ct_len ..]);
-    var pt = try allocator.alloc(u8, ct_len);
-    std.crypto.aead.chacha_poly.ChaCha20Poly1305.decrypt(pt, ct, tag, &[_]u8{}, nonce, key) catch {
-        allocator.free(pt);
+
+    var pt = try std.heap.page_allocator.alloc(u8, ct_len);
+    std.crypto.aead.chacha_poly.ChaCha20Poly1305.decrypt(pt, ct, tag, &[_]u8{}, nonce, key_bytes) catch {
+        std.heap.page_allocator.free(pt);
+        std.crypto.utils.secureZero(u8, key_bytes[0..]);
         return null;
     };
+    std.crypto.utils.secureZero(u8, key_bytes[0..]);
     return pt;
 }
 
