@@ -1,4 +1,5 @@
 const std = @import("std");
+const key = @import("../zig/src/key.zig");
 
 pub const Tag = enum { Int, Str, Bool, Pair, List };
 
@@ -9,40 +10,6 @@ pub const Type = union(Tag) {
     Pair: struct { a: *const Type, b: *const Type },
     List: *const Type,
 };
-
-fn canonicalBytesImpl(ty: Type, list: *std.ArrayList(u8)) !void {
-    switch (ty) {
-        .Int => try list.append(0),
-        .Str => try list.append(1),
-        .Bool => try list.append(2),
-        .Pair => |p| {
-            try list.append(3);
-            try canonicalBytesImpl(p.a.*, list);
-            try canonicalBytesImpl(p.b.*, list);
-        },
-        .List => |elem| {
-            try list.append(4);
-            try canonicalBytesImpl(elem.*, list);
-        },
-    }
-}
-
-fn canonicalBytes(allocator: std.mem.Allocator, ty: Type) ![]u8 {
-    var list = std.ArrayList(u8).init(allocator);
-    try canonicalBytesImpl(ty, &list);
-    return list.toOwnedSlice();
-}
-
-fn deriveKey(allocator: std.mem.Allocator, ty: Type) ![32]u8 {
-    const bytes = try canonicalBytes(allocator, ty);
-    defer allocator.free(bytes);
-    const salt = "TypeCryptHKDFSalt";
-    const info = "TypeCryptHKDFInfo";
-    const prk = std.crypto.hkdf.HkdfSha256.extract(salt, bytes);
-    var out: [32]u8 = undefined;
-    std.crypto.hkdf.HkdfSha256.expand(out[0..], info, prk);
-    return out;
-}
 
 fn hex(buf: []const u8) ![]u8 {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
@@ -64,9 +31,9 @@ pub fn main() !void {
         .{ .name = "list", .ty = list },
     };
     for (entries) |e| {
-        const bytes = try canonicalBytes(gpa, e.ty);
+        const bytes = try key.canonicalBytes(Type, gpa, e.ty);
         defer gpa.free(bytes);
-        const key = try deriveKey(gpa, e.ty);
+        const key = try key.deriveKey(Type, gpa, e.ty);
         var hex_buf: [64]u8 = undefined;
         const key_hex = std.fmt.bufPrint(&hex_buf, "{s}", .{std.fmt.fmtSliceHexLower(&key)}) catch unreachable;
         const bytes_repr = try std.fmt.allocPrint(gpa, "{any}", .{bytes});
