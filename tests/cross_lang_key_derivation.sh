@@ -25,23 +25,27 @@ fi
 
 # Run helpers
 
-# Cross-language encryption roundtrip
+# Cross-language encryption roundtrip for multiple types
 PLAINTEXT="cross-test"
-HS_CT=$(cd haskell && cabal exec runghc -- -isrc ../tests/crypt_hs.hs encrypt)
-RS_CT=$(cargo run --quiet --manifest-path rust/Cargo.toml --bin crypt_tool encrypt)
-ZIG_CT=$(zig run tests/crypt_zig.zig -- encrypt)
-HS_DEC_RS=$(cargo run --quiet --manifest-path rust/Cargo.toml --bin crypt_tool decrypt "$HS_CT")
-RS_DEC_HS=$(cd haskell && cabal exec runghc -- -isrc ../tests/crypt_hs.hs decrypt "$RS_CT")
-HS_DEC_ZG=$(cd haskell && cabal exec runghc -- -isrc ../tests/crypt_hs.hs decrypt "$ZIG_CT")
-RS_DEC_ZG=$(cargo run --quiet --manifest-path rust/Cargo.toml --bin crypt_tool decrypt "$ZIG_CT")
-ZIG_DEC_HS=$(zig run tests/crypt_zig.zig -- decrypt "$HS_CT")
-ZIG_DEC_RS=$(zig run tests/crypt_zig.zig -- decrypt "$RS_CT")
-if [ "$HS_DEC_RS" != "$PLAINTEXT" ] || [ "$RS_DEC_HS" != "$PLAINTEXT" ] || \
-   [ "$HS_DEC_ZG" != "$PLAINTEXT" ] || [ "$RS_DEC_ZG" != "$PLAINTEXT" ] || \
-   [ "$ZIG_DEC_HS" != "$PLAINTEXT" ] || [ "$ZIG_DEC_RS" != "$PLAINTEXT" ]; then
-  echo "Cross-language encryption mismatch" >&2
-  exit 1
-fi
+for T in int str pair; do
+  HS_CT=$(cd haskell && cabal exec runghc -- -isrc ../tests/crypt_hs.hs encrypt "$T")
+  RS_CT=$(cargo run --quiet --manifest-path rust/Cargo.toml --bin crypt_tool encrypt "$T")
+  ZIG_CT=$(zig run tests/crypt_zig.zig -- encrypt "$T")
+
+  HS_DEC_RS=$(cargo run --quiet --manifest-path rust/Cargo.toml --bin crypt_tool decrypt "$T" "$HS_CT")
+  RS_DEC_HS=$(cd haskell && cabal exec runghc -- -isrc ../tests/crypt_hs.hs decrypt "$T" "$RS_CT")
+  HS_DEC_ZG=$(cd haskell && cabal exec runghc -- -isrc ../tests/crypt_hs.hs decrypt "$T" "$ZIG_CT")
+  RS_DEC_ZG=$(cargo run --quiet --manifest-path rust/Cargo.toml --bin crypt_tool decrypt "$T" "$ZIG_CT")
+  ZIG_DEC_HS=$(zig run tests/crypt_zig.zig -- decrypt "$T" "$HS_CT")
+  ZIG_DEC_RS=$(zig run tests/crypt_zig.zig -- decrypt "$T" "$RS_CT")
+
+  if [ "$HS_DEC_RS" != "$PLAINTEXT" ] || [ "$RS_DEC_HS" != "$PLAINTEXT" ] || \
+     [ "$HS_DEC_ZG" != "$PLAINTEXT" ] || [ "$RS_DEC_ZG" != "$PLAINTEXT" ] || \
+     [ "$ZIG_DEC_HS" != "$PLAINTEXT" ] || [ "$ZIG_DEC_RS" != "$PLAINTEXT" ]; then
+    echo "Cross-language encryption mismatch for type $T" >&2
+    exit 1
+  fi
+done
 
 # Existing key derivation helpers
 HS_OUTPUT=$(cd haskell && cabal exec runghc -- -isrc ../tests/dump_hs.hs)

@@ -38,41 +38,52 @@ fn deriveKey(allocator: std.mem.Allocator, ty: Type) ![32]u8 {
     defer allocator.free(bytes);
     const salt = "TypeCryptHKDFSalt";
     const info = "TypeCryptHKDFInfo";
-    const prk = std.crypto.kdf.hkdf.HkdfSha256.extract(salt, bytes);
+
+    const prk = std.crypto.hkdf.HkdfSha256.extract(salt, bytes);
     var out: [32]u8 = undefined;
-    std.crypto.kdf.hkdf.HkdfSha256.expand(out[0..], info, prk);
+    std.crypto.hkdf.HkdfSha256.expand(out[0..], info, prk);
     return out;
 }
 
-fn encrypt(plaintext: []const u8) ![]u8 {
-    var key = try deriveKey(std.heap.page_allocator, Type{ .Int = {} });
+fn encrypt(
+    allocator: std.mem.Allocator,
+    ty: Type,
+    plaintext: []const u8,
+) ![]u8 {
+    const key = try deriveKey(allocator, ty);
+
     var nonce: [12]u8 = undefined;
     std.crypto.random.bytes(&nonce);
     const tag_len = std.crypto.aead.chacha_poly.ChaCha20Poly1305.tag_length;
-    var ct = try std.heap.page_allocator.alloc(u8, plaintext.len);
-    defer std.heap.page_allocator.free(ct);
+    var ct = try allocator.alloc(u8, plaintext.len);
+    defer allocator.free(ct);
     var tag: [tag_len]u8 = undefined;
     std.crypto.aead.chacha_poly.ChaCha20Poly1305.encrypt(ct, &tag, plaintext, &[_]u8{}, nonce, key);
-    var out = try std.heap.page_allocator.alloc(u8, nonce.len + ct.len + tag_len);
+    var out = try allocator.alloc(u8, nonce.len + ct.len + tag_len);
     std.mem.copy(u8, out[0..nonce.len], &nonce);
     std.mem.copy(u8, out[nonce.len .. nonce.len + ct.len], ct);
     std.mem.copy(u8, out[nonce.len + ct.len ..], &tag);
     return out;
 }
 
-fn decrypt(ciphertext: []const u8) !?[]u8 {
+fn decrypt(
+    allocator: std.mem.Allocator,
+    ty: Type,
+    ciphertext: []const u8,
+) !?[]u8 {
     const tag_len = std.crypto.aead.chacha_poly.ChaCha20Poly1305.tag_length;
     if (ciphertext.len < 12 + tag_len) return null;
-    var key = try deriveKey(std.heap.page_allocator, Type{ .Int = {} });
+    const key = try deriveKey(allocator, ty);
+
     var nonce: [12]u8 = undefined;
     std.mem.copy(u8, &nonce, ciphertext[0..12]);
     const ct_len = ciphertext.len - 12 - tag_len;
     const ct = ciphertext[12 .. 12 + ct_len];
     var tag: [tag_len]u8 = undefined;
     std.mem.copy(u8, &tag, ciphertext[12 + ct_len ..]);
-    var pt = try std.heap.page_allocator.alloc(u8, ct_len);
+    var pt = try allocator.alloc(u8, ct_len);
     std.crypto.aead.chacha_poly.ChaCha20Poly1305.decrypt(pt, ct, tag, &[_]u8{}, nonce, key) catch {
-        std.heap.page_allocator.free(pt);
+        allocator.free(pt);
         return null;
     };
     return pt;
@@ -92,30 +103,57 @@ fn unhex(allocator: std.mem.Allocator, s: []const u8) ![]u8 {
     return out;
 }
 
+const ty_int = Type{ .Int = {} };
+const ty_str = Type{ .Str = {} };
+const ty_bool = Type{ .Bool = {} };
+const ty_pair = Type{ .Pair = .{ .a = &ty_int, .b = &ty_bool } };
+
+fn parseType(name: []const u8) !Type {
+    if (std.mem.eql(u8, name, "int")) return ty_int;
+    if (std.mem.eql(u8, name, "str")) return ty_str;
+    if (std.mem.eql(u8, name, "pair")) return ty_pair;
+    return error.UnknownType;
+}
+
+fn usage() !void {
+    try std.io.getStdErr().writer().print(
+        "usage: encrypt|decrypt <type> [hex]\n",
+        .{},
+    );
+}
+
 pub fn main() !void {
     var gpa = std.heap.page_allocator;
     const args = try std.process.argsAlloc(gpa);
     defer std.process.argsFree(gpa, args);
-    if (args.len < 2) {
-        try std.io.getStdErr().writer().print("usage: encrypt|decrypt <hex>\n", .{});
+    if (args.len < 3) {
+        try usage();
         std.process.exit(1);
     }
     const cmd = args[1];
+    const ty = parseType(args[2]) catch {
+        try std.io.getStdErr().writer().print("unknown type\n", .{});
+        std.process.exit(1);
+    };
     const plaintext = "cross-test";
     if (std.mem.eql(u8, cmd, "encrypt")) {
-        const ct = try encrypt(plaintext);
+        if (args.len != 3) {
+            try usage();
+            std.process.exit(1);
+        }
+        const ct = try encrypt(gpa, ty, plaintext);
         defer gpa.free(ct);
         const hex_ct = try hex(gpa, ct);
         defer gpa.free(hex_ct);
         try std.io.getStdOut().writer().print("{s}\n", .{hex_ct});
     } else if (std.mem.eql(u8, cmd, "decrypt")) {
-        if (args.len != 3) {
-            try std.io.getStdErr().writer().print("decrypt requires hex ciphertext\n", .{});
+        if (args.len != 4) {
+            try usage();
             std.process.exit(1);
         }
-        const ct_bytes = try unhex(gpa, args[2]);
+        const ct_bytes = try unhex(gpa, args[3]);
         defer gpa.free(ct_bytes);
-        const pt_opt = try decrypt(ct_bytes);
+        const pt_opt = try decrypt(gpa, ty, ct_bytes);
         if (pt_opt) |pt| {
             defer gpa.free(pt);
             try std.io.getStdOut().writer().print("{s}\n", .{pt});
@@ -124,7 +162,8 @@ pub fn main() !void {
             std.process.exit(1);
         }
     } else {
-        try std.io.getStdErr().writer().print("usage: encrypt|decrypt <hex>\n", .{});
+        try usage();
         std.process.exit(1);
     }
 }
+
