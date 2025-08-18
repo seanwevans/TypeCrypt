@@ -38,6 +38,7 @@ fn deriveKey(allocator: std.mem.Allocator, ty: Type) ![32]u8 {
     defer allocator.free(bytes);
     const salt = "TypeCryptHKDFSalt";
     const info = "TypeCryptHKDFInfo";
+
     const prk = std.crypto.hkdf.HkdfSha256.extract(salt, bytes);
     var out: [32]u8 = undefined;
     std.crypto.hkdf.HkdfSha256.expand(out[0..], info, prk);
@@ -50,6 +51,7 @@ fn encrypt(
     plaintext: []const u8,
 ) ![]u8 {
     const key = try deriveKey(allocator, ty);
+
     var nonce: [12]u8 = undefined;
     std.crypto.random.bytes(&nonce);
     const tag_len = std.crypto.aead.chacha_poly.ChaCha20Poly1305.tag_length;
@@ -72,6 +74,7 @@ fn decrypt(
     const tag_len = std.crypto.aead.chacha_poly.ChaCha20Poly1305.tag_length;
     if (ciphertext.len < 12 + tag_len) return null;
     const key = try deriveKey(allocator, ty);
+
     var nonce: [12]u8 = undefined;
     std.mem.copy(u8, &nonce, ciphertext[0..12]);
     const ct_len = ciphertext.len - 12 - tag_len;
