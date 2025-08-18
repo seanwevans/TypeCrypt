@@ -1,3 +1,5 @@
+{-# LANGUAGE GADTs #-}
+
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as C
 import Numeric (readHex, showHex)
@@ -19,16 +21,29 @@ unhex _ = error "invalid hex"
 plaintext :: B.ByteString
 plaintext = C.pack "cross-test"
 
+data TV where
+  TV :: Type a -> Value -> TV
+
+parseType :: String -> Maybe TV
+parseType "int" = Just (TV TInt (V TInt (0 :: Int)))
+parseType "str" = Just (TV TString (V TString ""))
+parseType "pair" = Just (TV (TPair TInt TBool) (V (TPair TInt TBool) ((0 :: Int), False)))
+parseType _ = Nothing
+
 main :: IO ()
 main = do
   args <- getArgs
   case args of
-    ["encrypt"] -> do
-      ct <- encrypt TInt plaintext
-      putStrLn (hex ct)
-    ["decrypt", hexCt] -> do
-      let ct = unhex hexCt
-      case decrypt TInt (V TInt (0 :: Int)) ct of
-        Right pt -> C.putStrLn pt
-        Left _ -> putStrLn "FAIL"
-    _ -> putStrLn "usage: encrypt|decrypt [hex]"
+    ["encrypt", tyName] -> case parseType tyName of
+      Just (TV ty _) -> do
+        mct <- encrypt ty plaintext
+        maybe (putStrLn "FAIL") (putStrLn . hex) mct
+      Nothing -> putStrLn "unknown type"
+    ["decrypt", tyName, hexCt] -> case parseType tyName of
+      Just (TV ty val) -> do
+        let ct = unhex hexCt
+        case decrypt ty val ct of
+          Right pt -> C.putStrLn pt
+          Left _ -> putStrLn "FAIL"
+      Nothing -> putStrLn "unknown type"
+    _ -> putStrLn "usage: encrypt|decrypt <type> [hex]"

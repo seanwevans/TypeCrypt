@@ -11,6 +11,41 @@ pub const Type = union(Tag) {
     List: *const Type,
 };
 
+fn canonicalBytesImpl(ty: Type, list: *std.ArrayList(u8)) !void {
+    switch (ty) {
+        .Int => try list.append(0),
+        .Str => try list.append(1),
+        .Bool => try list.append(2),
+        .Pair => |p| {
+            try list.append(3);
+            try canonicalBytesImpl(p.a.*, list);
+            try canonicalBytesImpl(p.b.*, list);
+        },
+        .List => |elem| {
+            try list.append(4);
+            try canonicalBytesImpl(elem.*, list);
+        },
+    }
+}
+
+fn canonicalBytes(allocator: std.mem.Allocator, ty: Type) ![]u8 {
+    var list = std.ArrayList(u8).init(allocator);
+    try canonicalBytesImpl(ty, &list);
+    return list.toOwnedSlice();
+}
+
+fn deriveKey(allocator: std.mem.Allocator, ty: Type) ![32]u8 {
+    const bytes = try canonicalBytes(allocator, ty);
+    defer allocator.free(bytes);
+    const salt = "TypeCryptHKDFSalt";
+    const info = "TypeCryptHKDFInfo";
+    const prk = std.crypto.kdf.hkdf.HkdfSha256.extract(salt, bytes);
+    var out: [32]u8 = undefined;
+    std.crypto.kdf.hkdf.HkdfSha256.expand(out[0..], info, prk);
+    return out;
+}
+
+
 fn hex(buf: []const u8) ![]u8 {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();

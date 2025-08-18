@@ -25,31 +25,31 @@ main = hspec $ do
   describe "encrypt/decrypt" $ do
     it "roundtrips for Int" $ property $ \(n :: Int) bs ->
       ioProperty $ do
-        ctM <- encrypt TInt bs
-        pure $ maybe False (\ct -> decrypt TInt (V TInt n) ct == Right bs) ctM
+        ctE <- encrypt TInt bs
+        pure $ either (const False) (\ct -> decrypt TInt (V TInt n) ct == Right bs) ctE
     it "roundtrips for String" $ property $ \(s :: String) bs ->
       ioProperty $ do
-        ctM <- encrypt TString bs
-        pure $ maybe False (\ct -> decrypt TString (V TString s) ct == Right bs) ctM
+        ctE <- encrypt TString bs
+        pure $ either (const False) (\ct -> decrypt TString (V TString s) ct == Right bs) ctE
     it "roundtrips for (Int, String)" $ property $ \(a :: Int) (b :: String) bs ->
       ioProperty $ do
         let ty = TPair TInt TString
             val = V ty (a, b)
-        ctM <- encrypt ty bs
-        pure $ maybe False (\ct -> decrypt ty val ct == Right bs) ctM
+        ctE <- encrypt ty bs
+        pure $ either (const False) (\ct -> decrypt ty val ct == Right bs) ctE
     it "roundtrips for [Int]" $ property $ \(xs :: [Int]) bs ->
       ioProperty $ do
         let ty = TList TInt
             val = V ty xs
-        ctM <- encrypt ty bs
-        pure $ maybe False (\ct -> decrypt ty val ct == Right bs) ctM
+        ctE <- encrypt ty bs
+        pure $ either (const False) (\ct -> decrypt ty val ct == Right bs) ctE
     it "roundtrips for nested (Int, [String])" $
       property $ \(n :: Int) (xs :: [String]) bs ->
         ioProperty $ do
           let ty = TPair TInt (TList TString)
               val = V ty (n, xs)
-          ctM <- encrypt ty bs
-          pure $ maybe False (\ct -> decrypt ty val ct == Right bs) ctM
+          ctE <- encrypt ty bs
+          pure $ either (const False) (\ct -> decrypt ty val ct == Right bs) ctE
     it "matches Bool" $ property $ \b ->
       matches (V TBool b) TBool
     it "matches Pair" $ property $ \a b ->
@@ -58,63 +58,57 @@ main = hspec $ do
       matches (V (TList TInt) xs) (TList TInt)
     it "roundtrips for Bool" $ property $ \(b :: Bool) bs ->
       ioProperty $ do
-        ctM <- encrypt TBool bs
-        pure $ maybe False (\ct -> decrypt TBool (V TBool b) ct == Right bs) ctM
+        ctE <- encrypt TBool bs
+        pure $ either (const False) (\ct -> decrypt TBool (V TBool b) ct == Right bs) ctE
     it "roundtrips for Pair" $ property $ \(a :: Int) (b :: String) bs ->
       ioProperty $ do
         let t = TPair TInt TString
-        ctM <- encrypt t bs
-        pure $ maybe False (\ct -> decrypt t (V t (a, b)) ct == Right bs) ctM
+        ctE <- encrypt t bs
+        pure $ either (const False) (\ct -> decrypt t (V t (a, b)) ct == Right bs) ctE
     it "roundtrips for List" $ property $ \(xs :: [Int]) bs ->
       ioProperty $ do
         let t = TList TInt
-        ctM <- encrypt t bs
-        pure $ maybe False (\ct -> decrypt t (V t xs) ct == Right bs) ctM
+        ctE <- encrypt t bs
+        pure $ either (const False) (\ct -> decrypt t (V t xs) ct == Right bs) ctE
     it "multiple encryptions use different nonces" $
       property $ \(bs :: ByteString) -> ioProperty $ do
         let ty = TInt
-        ct1M <- encrypt ty bs
-        ct2M <- encrypt ty bs
-        pure $ case (ct1M, ct2M) of
-          (Just ct1, Just ct2) -> ct1 /= ct2
+        ct1E <- encrypt ty bs
+        ct2E <- encrypt ty bs
+        pure $ case (ct1E, ct2E) of
+          (Right ct1, Right ct2) -> ct1 /= ct2
           _ -> False
     it "fails to decrypt with mismatched Value" $
       property $ \(bs :: ByteString) (s :: String) -> ioProperty $ do
         let ty = TInt
-        ctM <- encrypt ty bs
-        pure $ maybe False (\ct -> decrypt ty (V TString s) ct == Left TypeMismatch) ctM
+        ctE <- encrypt ty bs
+        pure $ either (const False) (\ct -> decrypt ty (V TString s) ct == Left TypeMismatch) ctE
     it "fails to decrypt with wrong Type" $
       property $ \(n :: Int) bs -> ioProperty $ do
-        ctM <- encrypt TInt bs
-        pure $ maybe False (\ct -> decrypt TString (V TInt n) ct == Left TypeMismatch) ctM
+        ctE <- encrypt TInt bs
+        pure $ either (const False) (\ct -> decrypt TString (V TInt n) ct == Left TypeMismatch) ctE
 
     it "fails to decrypt when ciphertext is truncated" $
       property $ \(n :: Int) (bs :: ByteString) -> ioProperty $ do
-        ctM <- encrypt TInt bs
-        pure $
-          maybe
-            False
-            ( \ct ->
-                let truncated = B.take (B.length ct - 1) ct
-                 in case decrypt TInt (V TInt n) truncated of
-                      Left TruncatedCiphertext -> True
-                      Left CryptoError -> True
-                      _ -> False
-            )
-            ctM
+        ctE <- encrypt TInt bs
+        pure $ case ctE of
+          Right ct ->
+            let truncated = B.take (B.length ct - 1) ct
+             in case decrypt TInt (V TInt n) truncated of
+                  Left TruncatedCiphertext -> True
+                  Left DecryptCryptoError -> True
+                  _ -> False
+          Left _ -> False
 
     it "fails to decrypt when ciphertext is tampered" $
       property $ \(n :: Int) (bs :: ByteString) -> ioProperty $ do
-        ctM <- encrypt TInt bs
-        pure $
-          maybe
-            False
-            ( \ct ->
-                let first = B.index ct 0
-                    tampered = B.cons (first `xor` 1) (B.drop 1 ct)
-                 in decrypt TInt (V TInt n) tampered == Left CryptoError
-            )
-            ctM
+        ctE <- encrypt TInt bs
+        pure $ case ctE of
+          Right ct ->
+            let first = B.index ct 0
+                tampered = B.cons (first `xor` 1) (B.drop 1 ct)
+             in decrypt TInt (V TInt n) tampered == Left DecryptCryptoError
+          Left _ -> False
 
   describe "key derivation" $ do
     it "key derivation is deterministic" $ do

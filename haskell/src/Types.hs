@@ -44,7 +44,13 @@ instance Show Value where
 data DecryptError
   = TypeMismatch
   | TruncatedCiphertext
-  | NonceError
+  | DecryptNonceError
+  | DecryptCryptoError
+  deriving (Eq, Show)
+
+-- | Errors that can occur during encryption.
+data EncryptError
+  = NonceError
   | CryptoError
   deriving (Eq, Show)
 
@@ -83,19 +89,19 @@ keyFromType ty =
       prk = extract salt ikm
    in expand prk info 32
 
-encrypt :: Type a -> ByteString -> IO (Maybe ByteString)
+encrypt :: Type a -> ByteString -> IO (Either EncryptError ByteString)
 encrypt ty plaintext = do
   nonceBytes <- getRandomBytes 12
   let key = keyFromType ty
   pure $ case C.nonce12 nonceBytes of
-    CryptoFailed _ -> Nothing
+    CryptoFailed _ -> Left NonceError
     CryptoPassed nonce -> case C.initialize key nonce of
-      CryptoFailed _ -> Nothing
+      CryptoFailed _ -> Left CryptoError
       CryptoPassed st1 ->
         let st2 = C.finalizeAAD st1
             (out, st3) = C.encrypt plaintext st2
             tag = C.finalize st3
-         in Just $ nonceBytes `B.append` out `B.append` convert tag
+         in Right $ nonceBytes `B.append` out `B.append` convert tag
 
 -- | Decrypt if the value matches the expected type and authentication tag checks.
 decrypt :: Type a -> Value -> ByteString -> Either DecryptError ByteString
@@ -107,14 +113,14 @@ decrypt ty val input
           (ct, tagBytes) = B.splitAt (B.length rest - 16) rest
           key = keyFromType ty
        in case C.nonce12 nonceBytes of
-            CryptoFailed _ -> Left NonceError
+            CryptoFailed _ -> Left DecryptNonceError
             CryptoPassed nonce -> case C.initialize key nonce of
-              CryptoFailed _ -> Left CryptoError
+              CryptoFailed _ -> Left DecryptCryptoError
               CryptoPassed st1 ->
                 let st2 = C.finalizeAAD st1
                     (pt, st3) = C.decrypt ct st2
                     tag = C.finalize st3
                  in case authTag tagBytes of
-                      CryptoFailed _ -> Left CryptoError
+                      CryptoFailed _ -> Left DecryptCryptoError
                       CryptoPassed t ->
-                        if constEq t tag then Right pt else Left CryptoError
+                        if constEq t tag then Right pt else Left DecryptCryptoError
