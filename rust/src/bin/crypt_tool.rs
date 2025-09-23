@@ -76,10 +76,15 @@ fn main() -> Result<(), ring::error::Unspecified> {
             }
 
             let ty = parse_type(&args[2]).unwrap_or_else(|| usage());
-            let ct = unhex(&args[3]);
+            let ct = match unhex(&args[3]) {
+                Ok(bytes) => bytes,
+                Err(_) => {
+                    println!("FAIL");
+                    std::process::exit(1);
+                }
+            };
             let val = default_value(&ty);
             match decrypt_with_value(&ty, &val, &ct) {
-
                 Ok(pt) => println!("{}", String::from_utf8_lossy(&pt)),
                 Err(_) => {
                     println!("FAIL");

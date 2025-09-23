@@ -45,6 +45,18 @@ for T in int str pair; do
     echo "Cross-language encryption mismatch for type $T" >&2
     exit 1
   fi
+
+  if [ "$T" != "int" ]; then
+    set +e
+    ZIG_WRONG_OUTPUT=$(zig run tests/crypt_zig.zig -- decrypt int "$ZIG_CT" 2>/dev/null)
+    ZIG_WRONG_STATUS=$?
+    set -e
+    if [ "$ZIG_WRONG_STATUS" -eq 0 ]; then
+      echo "Zig CLI accepted mismatched schema for ciphertext generated as $T" >&2
+      echo "Unexpected output: $ZIG_WRONG_OUTPUT" >&2
+      exit 1
+    fi
+  fi
 done
 
 # Existing key derivation helpers
