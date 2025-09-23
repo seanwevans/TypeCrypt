@@ -11,54 +11,13 @@ pub const Type = union(Tag) {
     List: *const Type,
 };
 
-
-const int_ty = Type{ .Int = {} };
-
-fn encrypt(plaintext: []const u8) ![]u8 {
-    var key_bytes = try key.deriveKey(Type, std.heap.page_allocator, int_ty);
-
-fn canonicalBytesImpl(ty: Type, list: *std.ArrayList(u8)) !void {
-    switch (ty) {
-        .Int => try list.append(0),
-        .Str => try list.append(1),
-        .Bool => try list.append(2),
-        .Pair => |p| {
-            try list.append(3);
-            try canonicalBytesImpl(p.a.*, list);
-            try canonicalBytesImpl(p.b.*, list);
-        },
-        .List => |elem| {
-            try list.append(4);
-            try canonicalBytesImpl(elem.*, list);
-        },
-    }
-}
-
-fn canonicalBytes(allocator: std.mem.Allocator, ty: Type) ![]u8 {
-    var list = std.ArrayList(u8).init(allocator);
-    try canonicalBytesImpl(ty, &list);
-    return list.toOwnedSlice();
-}
-
-fn deriveKey(allocator: std.mem.Allocator, ty: Type) ![32]u8 {
-    const bytes = try canonicalBytes(allocator, ty);
-    defer allocator.free(bytes);
-    const salt = "TypeCryptHKDFSalt";
-    const info = "TypeCryptHKDFInfo";
-
-    const prk = std.crypto.hkdf.HkdfSha256.extract(salt, bytes);
-    var out: [32]u8 = undefined;
-    std.crypto.hkdf.HkdfSha256.expand(out[0..], info, prk);
-    return out;
-}
-
 fn encrypt(
     allocator: std.mem.Allocator,
     ty: Type,
     plaintext: []const u8,
 ) ![]u8 {
-    const key = try deriveKey(allocator, ty);
-
+    var key_bytes = try key.deriveKey(Type, allocator, ty);
+    defer std.crypto.utils.secureZero(u8, key_bytes[0..]);
 
     var nonce: [12]u8 = undefined;
     std.crypto.random.bytes(&nonce);
@@ -68,12 +27,11 @@ fn encrypt(
     var tag: [tag_len]u8 = undefined;
 
     std.crypto.aead.chacha_poly.ChaCha20Poly1305.encrypt(ct, &tag, plaintext, &[_]u8{}, nonce, key_bytes);
-    var out = try std.heap.page_allocator.alloc(u8, nonce.len + ct.len + tag_len);
+    var out = try allocator.alloc(u8, nonce.len + ct.len + tag_len);
 
     std.mem.copy(u8, out[0..nonce.len], &nonce);
     std.mem.copy(u8, out[nonce.len .. nonce.len + ct.len], ct);
     std.mem.copy(u8, out[nonce.len + ct.len ..], &tag);
-    std.crypto.utils.secureZero(u8, key_bytes[0..]);
     return out;
 }
 
@@ -85,7 +43,8 @@ fn decrypt(
     const tag_len = std.crypto.aead.chacha_poly.ChaCha20Poly1305.tag_length;
     if (ciphertext.len < 12 + tag_len) return null;
 
-    var key_bytes = try key.deriveKey(Type, std.heap.page_allocator, int_ty);
+    var key_bytes = try key.deriveKey(Type, allocator, ty);
+    defer std.crypto.utils.secureZero(u8, key_bytes[0..]);
 
     var nonce: [12]u8 = undefined;
     std.mem.copy(u8, &nonce, ciphertext[0..12]);
@@ -94,13 +53,11 @@ fn decrypt(
     var tag: [tag_len]u8 = undefined;
     std.mem.copy(u8, &tag, ciphertext[12 + ct_len ..]);
 
-    var pt = try std.heap.page_allocator.alloc(u8, ct_len);
+    var pt = try allocator.alloc(u8, ct_len);
     std.crypto.aead.chacha_poly.ChaCha20Poly1305.decrypt(pt, ct, tag, &[_]u8{}, nonce, key_bytes) catch {
-        std.heap.page_allocator.free(pt);
-        std.crypto.utils.secureZero(u8, key_bytes[0..]);
+        allocator.free(pt);
         return null;
     };
-    std.crypto.utils.secureZero(u8, key_bytes[0..]);
     return pt;
 }
 
@@ -181,4 +138,3 @@ pub fn main() !void {
         std.process.exit(1);
     }
 }
-
