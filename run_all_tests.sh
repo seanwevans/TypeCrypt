@@ -33,3 +33,11 @@ else
   echo "cross_lang_key_derivation.sh not found" >&2
   exit 1
 fi
+
+# Haskell CLI regression for encrypt output
+if [ -x tests/haskell_encrypt_cli.sh ]; then
+  ./tests/haskell_encrypt_cli.sh
+else
+  echo "haskell_encrypt_cli.sh not found" >&2
+  exit 1
+fi
