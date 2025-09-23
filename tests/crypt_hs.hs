@@ -36,8 +36,8 @@ main = do
   case args of
     ["encrypt", tyName] -> case parseType tyName of
       Just (TV ty _) -> do
-        mct <- encrypt ty plaintext
-        maybe (putStrLn "FAIL") (putStrLn . hex) mct
+        result <- encrypt ty plaintext
+        either (putStrLn . ("FAIL: " ++) . show) (putStrLn . hex) result
       Nothing -> putStrLn "unknown type"
     ["decrypt", tyName, hexCt] -> case parseType tyName of
       Just (TV ty val) -> do
