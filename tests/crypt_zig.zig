@@ -2,6 +2,7 @@ const std = @import("std");
 const key = @import("../zig/src/key.zig");
 const zig_main = @import("../zig/src/main.zig");
 
+
 const Type = zig_main.Type;
 const Value = zig_main.Value;
 
@@ -25,6 +26,7 @@ fn defaultValue(ty: Type) Value {
         .List => Value{ .List = empty_value_list[0..] },
     };
 }
+
 
 fn encrypt(
     allocator: std.mem.Allocator,
@@ -52,6 +54,7 @@ fn encrypt(
         key_bytes,
     );
     std.mem.copyForwards(u8, out[Aead.nonce_length + plaintext.len ..], tag[0..]);
+
     return out;
 }
 
@@ -65,8 +68,10 @@ fn decrypt(
     if (!zig_main.matches(value, ty)) return null;
     if (ciphertext.len < Aead.nonce_length + Aead.tag_length) return null;
 
+
     var key_bytes = try key.deriveKey(Type, allocator, ty);
     defer std.crypto.utils.secureZero(u8, key_bytes[0..]);
+
 
     var nonce: [Aead.nonce_length]u8 = undefined;
     std.mem.copyForwards(u8, nonce[0..], ciphertext[0..Aead.nonce_length]);
@@ -77,6 +82,7 @@ fn decrypt(
 
     var pt = try allocator.alloc(u8, ct_len);
     Aead.decrypt(pt, ct, tag, &[_]u8{}, nonce, key_bytes) catch {
+
         allocator.free(pt);
         return null;
     };
