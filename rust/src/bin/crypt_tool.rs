@@ -45,11 +45,23 @@ fn decrypt_from_hex(ty: &Type, ciphertext_hex: &str) -> Result<Vec<u8>, CliDecry
 const PLAINTEXT: &[u8] = b"cross-test";
 
 fn parse_type(name: &str) -> Option<Type> {
-    match name {
+    let trimmed = name.trim();
+    match trimmed {
         "int" => Some(Type::Int),
         "str" => Some(Type::Str),
+        "bool" => Some(Type::Bool),
         "pair" => Some(Type::Pair(Box::new(Type::Int), Box::new(Type::Bool))),
-        _ => None,
+        "list" => Some(Type::List(Box::new(Type::Int))),
+        _ => {
+            if let Some(inner) = trimmed.strip_prefix("list<") {
+                inner
+                    .strip_suffix('>')
+                    .and_then(parse_type)
+                    .map(|t| Type::List(Box::new(t)))
+            } else {
+                None
+            }
+        }
     }
 }
 
@@ -88,7 +100,15 @@ fn main() -> Result<(), ring::error::Unspecified> {
             }
 
             let ty = parse_type(&args[2]).unwrap_or_else(|| usage());
-            match decrypt_from_hex(&ty, &args[3]) {
+            let ct = match unhex(&args[3]) {
+                Ok(bytes) => bytes,
+                Err(e) => {
+                    eprintln!("{e}");
+                    std::process::exit(1);
+                }
+            };
+            let val = default_value(&ty);
+            match decrypt_with_value(&ty, &val, &ct) {
                 Ok(pt) => println!("{}", String::from_utf8_lossy(&pt)),
                 Err(CliDecryptError::Hex(err)) => {
                     eprintln!("invalid ciphertext: {err}");
