@@ -1,4 +1,5 @@
 # TypeCrypt 🔐
+<img width="256" alt="It's a safe Jim." src="https://github.com/user-attachments/assets/31185a03-004d-4f1d-86eb-78678c44251f" />
 
 **TypeCrypt** is an encryption system where *types themselves are the key*. Decryption is only possible if a submitted value *resolves to the expected type*.
 
