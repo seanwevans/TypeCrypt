@@ -17,7 +17,9 @@ The project is organized into four interoperating implementations:
   - Generates simple x86_64 assembly snippets for low-level exploration.
   - Serves as a sandbox for examining minimal representations.
 
-Internally each branch shares the same core idea: derive a symmetric key from a `Type` and authenticate that a runtime `Value` matches that type before revealing the plaintext.  Both the Haskell and Rust implementations hash a canonical byte encoding of the type with SHA-256.  Data is encrypted with ChaCha20-Poly1305.  Although this mapping is purely demonstrative, it shows how type satisfaction gates decryption.
+Internally each branch shares the same core idea: derive a symmetric key from a `Type` and authenticate that a runtime `Value` matches that type before revealing the plaintext.  Both the Haskell and Rust implementations hash a canonical byte encoding of the type with SHA-256.  Data is encrypted with ChaCha20-Poly1305.  This mapping is purely demonstrative: it is a type-aware AEAD wrapper, not a predicate-encryption construction.
+
+The long-term research target is cryptographic enforcement of predicate/type satisfaction. In that model, ciphertexts and keys are generated so that decryption succeeds only when an encoded predicate holds, following the predicate-encryption and functional-encryption line of work. The current matcher remains useful as an executable semantics reference, but future security claims should be made only for a backend that embeds satisfaction in the cryptographic construction itself. See [Research Direction](research.md) for details.
 
 Changes generally flow from Haskell to Rust to Zig. Haskell establishes the formal semantics; Rust implements them in a production setting; Zig prototypes new concepts that may feed back upstream.
 

@@ -17,4 +17,5 @@ See the [README](../README.md) for details on building and testing each implemen
 
 - [Source on GitHub](https://github.com/seanwevans/TypeCrypt)
 - [Project Roadmap](../ROADMAP.md)
+- [Research Direction](research.md)
 

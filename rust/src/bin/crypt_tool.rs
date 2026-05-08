@@ -1,5 +1,5 @@
 use std::{env, fmt, num::ParseIntError};
-use typecrypt::{decrypt_with_value, encrypt, DecryptError, Type, Value};
+use typecrypt::{decrypt_with_value, encrypt, Type, Value};
 
 fn hex(bytes: &[u8]) -> String {
     bytes.iter().map(|b| format!("{:02x}", b)).collect()
@@ -30,16 +30,18 @@ fn unhex(s: &str) -> Result<Vec<u8>, HexError> {
         .collect()
 }
 
+#[cfg(test)]
 #[derive(Debug)]
 enum CliDecryptError {
     Hex(HexError),
-    Decrypt(DecryptError),
+    Decrypt,
 }
 
+#[cfg(test)]
 fn decrypt_from_hex(ty: &Type, ciphertext_hex: &str) -> Result<Vec<u8>, CliDecryptError> {
     let ct = unhex(ciphertext_hex).map_err(CliDecryptError::Hex)?;
     let val = default_value(ty);
-    decrypt_with_value(ty, &val, ct.as_slice()).map_err(CliDecryptError::Decrypt)
+    decrypt_with_value(ty, &val, ct.as_slice()).map_err(|_| CliDecryptError::Decrypt)
 }
 
 const PLAINTEXT: &[u8] = b"cross-test";
@@ -110,11 +112,7 @@ fn main() -> Result<(), ring::error::Unspecified> {
             let val = default_value(&ty);
             match decrypt_with_value(&ty, &val, &ct) {
                 Ok(pt) => println!("{}", String::from_utf8_lossy(&pt)),
-                Err(CliDecryptError::Hex(err)) => {
-                    eprintln!("invalid ciphertext: {err}");
-                    std::process::exit(1);
-                }
-                Err(CliDecryptError::Decrypt(err)) => {
+                Err(err) => {
                     let _ = err;
                     println!("FAIL");
                     std::process::exit(1);

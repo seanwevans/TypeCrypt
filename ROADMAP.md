@@ -65,6 +65,21 @@ as work progresses and corresponding GitHub issues are resolved.
 
 ---
 
+## 🧪 Research-Grade Cryptographic Binding
+
+> _Purpose_: Move beyond a demonstrative matcher-gated AEAD wrapper toward predicate/type satisfaction enforced by cryptographic construction.
+
+**Goals:**
+- [ ] Map TypeCrypt `Type` constructors to an explicit predicate class
+- [ ] Specify key generation, encryption, and decryption algorithms for predicate/type-bound access
+- [ ] Evaluate predicate-encryption and functional-encryption constructions as possible backends
+- [ ] Document the security model, leakage profile, and collusion-resistance assumptions
+- [ ] Keep the existing matcher as a semantics oracle while avoiding security claims based on application-side `if` checks
+
+See [docs/research.md](docs/research.md) for the detailed research framing.
+
+---
+
 ## 🧮 Long-Term Goals
 
 - [ ] Transpile Haskell IR to:
